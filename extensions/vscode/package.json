@@ -1,0 +1,178 @@
+{
+  "name": "ide-event-collector",
+  "displayName": "IDE Event Collector",
+  "description": "Collects IDE activity events and ships them to the Universal IDE Event Collection Platform.",
+  "version": "0.1.0",
+  "publisher": "ide-collector",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ideCollector.register",
+        "title": "IDE Collector: Register This Installation",
+        "category": "IDE Collector"
+      },
+      {
+        "command": "ideCollector.showStatus",
+        "title": "IDE Collector: Show Status",
+        "category": "IDE Collector"
+      },
+      {
+        "command": "ideCollector.flushNow",
+        "title": "IDE Collector: Flush Queued Events Now",
+        "category": "IDE Collector"
+      },
+      {
+        "command": "ideCollector.toggleTelemetry",
+        "title": "IDE Collector: Enable/Disable Telemetry",
+        "category": "IDE Collector"
+      },
+      {
+        "command": "ideCollector.signOut",
+        "title": "IDE Collector: Sign Out and Clear Credentials",
+        "category": "IDE Collector"
+      }
+    ],
+    "configuration": {
+      "title": "IDE Event Collector",
+      "properties": {
+        "telemetry.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable event collection. Off by default; collection is strictly opt-in."
+        },
+        "telemetry.ingestionEndpoint": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "Base URL of the event ingestion service."
+        },
+        "telemetry.registrationEndpoint": {
+          "type": "string",
+          "default": "http://localhost:8081",
+          "description": "Base URL of the control-plane API used to register this installation."
+        },
+        "telemetry.batchSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of events sent per request."
+        },
+        "telemetry.flushInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "How often, in milliseconds, buffered events are flushed."
+        },
+        "telemetry.maxQueueSize": {
+          "type": "number",
+          "default": 10000,
+          "description": "Maximum events retained locally while offline. Oldest events are dropped beyond this."
+        },
+        "telemetry.redactSecrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Redact secrets from event payloads before they leave this machine."
+        },
+        "telemetry.hashFilePaths": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send a hash instead of the real file path."
+        },
+        "telemetry.encryptLocalQueue": {
+          "type": "boolean",
+          "default": true,
+          "description": "Encrypt the offline event queue on disk."
+        },
+        "telemetry.disabledEventTypes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Event types to never collect, e.g. [\"editor.cursor_moved\"]."
+        },
+        "telemetry.capture.workspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect workspace and project events."
+        },
+        "telemetry.capture.file": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect file lifecycle events."
+        },
+        "telemetry.capture.editor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect editor events (cursor, selection, document changes)."
+        },
+        "telemetry.capture.terminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect terminal lifecycle and command events. Command text is redacted."
+        },
+        "telemetry.capture.git": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect Git events (branch changes, commits, repository state)."
+        },
+        "telemetry.capture.buildTestDebug": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect build, test, debug, and diagnostics events."
+        },
+        "telemetry.capture.ai": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collect AI assistant events where the IDE exposes them."
+        },
+        "telemetry.throttle.cursorMovedMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "Minimum interval between cursor-movement events per file."
+        },
+        "telemetry.throttle.selectionChangedMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "Minimum interval between selection-change events per file."
+        },
+        "telemetry.throttle.documentChangedMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "Minimum interval between document-change events per file."
+        },
+        "telemetry.throttle.diagnosticsMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "Minimum interval between diagnostics events per file."
+        },
+        "telemetry.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Verbosity of the extension's output channel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ide-collector/event-schema": "*",
+    "@ide-collector/event-sdk": "*",
+    "@ide-collector/crypto": "*",
+    "@ide-collector/shared-utils": "*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.14.15",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

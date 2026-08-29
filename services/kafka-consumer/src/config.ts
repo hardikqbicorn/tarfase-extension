@@ -1,9 +1,3 @@
-/**
- * All configuration comes from environment variables. No secret is ever
- * committed or defaulted to a real value: the service refuses to start in
- * production without an explicitly provided JWT secret.
- */
-
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -52,58 +46,66 @@ export function readSaslConfig(): KafkaSaslConfig | undefined {
   return { mechanism, username, password } as KafkaSaslConfig;
 }
 
-export interface ProducerServiceConfig {
+export interface ConsumerServiceConfig {
   nodeEnv: string;
-  host: string;
-  port: number;
   logLevel: "debug" | "info" | "warn" | "error";
-
-  jwtSecret: string;
+  /** Port for the /health, /ready, /metrics endpoints. */
+  port: number;
+  host: string;
 
   kafka: {
     clientId: string;
+    groupId: string;
     brokers: string[];
     ssl: boolean;
     sasl?: KafkaSaslConfig;
     rawTopic: string;
     errorTopic: string;
-    /** `-1` (all) waits for every in-sync replica; the safest ack setting. */
-    acks: number;
-    retries: number;
-    requestTimeoutMs: number;
+    processedTopic: string;
+    sessionTimeoutMs: number;
+    heartbeatIntervalMs: number;
+    maxBytesPerPartition: number;
+    fromBeginning: boolean;
   };
 
-  maxBatchEvents: number;
-  bodyLimitBytes: number;
+  databaseUrl: string;
+  databasePoolSize: number;
+  /** Rows per INSERT. Large batches amortize round-trips; too large blows past statement limits. */
+  writeBatchSize: number;
+  /** Publish successfully persisted events to ide.events.processed for downstream consumers. */
+  emitProcessedEvents: boolean;
 }
 
-export function loadConfig(): ProducerServiceConfig {
+export function loadConfig(): ConsumerServiceConfig {
   const nodeEnv = optional("NODE_ENV", "development");
   const isProd = nodeEnv === "production";
 
   return {
     nodeEnv,
+    logLevel: optional("LOG_LEVEL", "info") as ConsumerServiceConfig["logLevel"],
+    port: optionalInt("PORT", 8082),
     host: optional("HOST", "0.0.0.0"),
-    port: optionalInt("PORT", 8080),
-    logLevel: optional("LOG_LEVEL", "info") as ProducerServiceConfig["logLevel"],
-
-    // In development a well-known dev secret keeps `docker compose up` working
-    // out of the box; production must supply its own.
-    jwtSecret: isProd ? required("JWT_SECRET") : optional("JWT_SECRET", "dev-only-insecure-secret"),
 
     kafka: {
-      clientId: optional("KAFKA_CLIENT_ID", "ide-collector-producer"),
+      clientId: optional("KAFKA_CLIENT_ID", "ide-collector-consumer"),
+      groupId: optional("KAFKA_GROUP_ID", "ide-events-persister"),
       brokers: optional("KAFKA_BROKERS", "localhost:9092").split(",").map((b) => b.trim()),
       ssl: optionalBool("KAFKA_SSL", false),
       sasl: readSaslConfig(),
       rawTopic: optional("KAFKA_TOPIC_RAW", "ide.events.raw"),
       errorTopic: optional("KAFKA_TOPIC_ERRORS", "ide.events.errors"),
-      acks: optionalInt("KAFKA_ACKS", -1),
-      retries: optionalInt("KAFKA_RETRIES", 8),
-      requestTimeoutMs: optionalInt("KAFKA_REQUEST_TIMEOUT_MS", 30_000),
+      processedTopic: optional("KAFKA_TOPIC_PROCESSED", "ide.events.processed"),
+      sessionTimeoutMs: optionalInt("KAFKA_SESSION_TIMEOUT_MS", 30_000),
+      heartbeatIntervalMs: optionalInt("KAFKA_HEARTBEAT_INTERVAL_MS", 3_000),
+      maxBytesPerPartition: optionalInt("KAFKA_MAX_BYTES_PER_PARTITION", 1_048_576),
+      fromBeginning: optionalBool("KAFKA_FROM_BEGINNING", true),
     },
 
-    maxBatchEvents: optionalInt("MAX_BATCH_EVENTS", 1000),
-    bodyLimitBytes: optionalInt("BODY_LIMIT_BYTES", 5 * 1024 * 1024),
+    databaseUrl: isProd
+      ? required("DATABASE_URL")
+      : optional("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ide_events"),
+    databasePoolSize: optionalInt("DATABASE_POOL_SIZE", 10),
+    writeBatchSize: optionalInt("WRITE_BATCH_SIZE", 200),
+    emitProcessedEvents: optionalBool("EMIT_PROCESSED_EVENTS", false),
   };
 }
