@@ -39,6 +39,7 @@ import { createConsumerMetrics } from "../../services/kafka-consumer/src/metrics
 const JWT_SECRET = "integration-test-secret";
 const INSTALLATION_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
+const SESSION_ID = "33333333-3333-4333-8333-333333333333";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -213,7 +214,7 @@ async function buildPipeline(): Promise<Pipeline> {
     identity: {
       userId: USER_ID,
       installationId: INSTALLATION_ID,
-      sessionId: "33333333-3333-4333-8333-333333333333",
+      sessionId: SESSION_ID,
     },
     contextProvider: {
       getContext: () => ({
@@ -287,6 +288,7 @@ async function buildPipeline(): Promise<Pipeline> {
       if (pool) {
         await pool.query(`DELETE FROM raw_events WHERE installation_id = $1`, [INSTALLATION_ID]);
         await pool.query(`DELETE FROM event_errors`);
+        await pool.query(`DELETE FROM ide_sessions WHERE external_id = $1`, [SESSION_ID]);
       }
     },
   };
@@ -315,6 +317,7 @@ describe(`end-to-end pipeline (${TEST_DATABASE_URL ? "real Postgres" : "in-memor
     if (store instanceof InMemoryEventStore) {
       store.events.clear();
       store.errors.length = 0;
+      store.sessions.clear();
     }
     pipeline = await buildPipeline();
     await pipeline.reset();
@@ -381,6 +384,27 @@ describe(`end-to-end pipeline (${TEST_DATABASE_URL ? "real Postgres" : "in-memor
     const rows = await pipeline.queryEvents();
     expect(rows).toHaveLength(sequence.length);
     expect(rows.map((r) => r.event_type)).toEqual(sequence.map((e) => e.eventType));
+  });
+
+  it("populates the ide_sessions dimension as events land", async () => {
+    for (let i = 0; i < 3; i++) {
+      pipeline.collector.capture({ eventType: EVENT_TYPES.FILE_SAVED, payload: { i } });
+    }
+    await pipeline.collector.flush();
+    await pipeline.drainToDatabase();
+
+    if (pool) {
+      const result = await pool.query(
+        `SELECT external_id, ide_name, event_count FROM ide_sessions WHERE external_id = $1`,
+        [SESSION_ID]
+      );
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].ide_name).toBe("vscode");
+      expect(Number(result.rows[0].event_count)).toBe(3);
+    } else {
+      const session = (store as InMemoryEventStore).sessions.get(SESSION_ID);
+      expect(session?.count).toBe(3);
+    }
   });
 
   it("is idempotent: replaying the topic creates no duplicate rows", async () => {

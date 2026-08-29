@@ -201,6 +201,35 @@ describe("EventProcessor", () => {
     expect(result.failed).toBe(2);
   });
 
+  it("maintains the session dimension with one write per session per batch", async () => {
+    const upsertCalls: Array<{ sessionId: string; count: number }> = [];
+    store.upsertSession = async (event, count) => {
+      upsertCalls.push({ sessionId: event.session_id, count });
+    };
+
+    await processor.processBatch([
+      asMessage(makeEvent({ sessionId: "session-a" }), "0"),
+      asMessage(makeEvent({ sessionId: "session-a" }), "1"),
+      asMessage(makeEvent({ sessionId: "session-a" }), "2"),
+      asMessage(makeEvent({ sessionId: "session-b" }), "3"),
+    ]);
+
+    // Four events, two sessions -> two writes, not four.
+    expect(upsertCalls).toHaveLength(2);
+    expect(upsertCalls.find((c) => c.sessionId === "session-a")?.count).toBe(3);
+    expect(upsertCalls.find((c) => c.sessionId === "session-b")?.count).toBe(1);
+  });
+
+  it("does not fail the batch when the session dimension write fails", async () => {
+    store.upsertSession = async () => {
+      throw new Error("ide_sessions unavailable");
+    };
+
+    const result = await processor.processBatch([asMessage(makeEvent())]);
+    expect(result.persisted).toBe(1);
+    expect(store.all()).toHaveLength(1);
+  });
+
   it("records metrics for processed events", async () => {
     const metrics = createConsumerMetrics();
     const instrumented = new EventProcessor({ store, logger: silentLogger, metrics });

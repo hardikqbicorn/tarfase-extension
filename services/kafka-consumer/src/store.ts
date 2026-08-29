@@ -25,7 +25,7 @@ export interface EventErrorRecord {
 export interface EventStore {
   persistEvents(events: IDEEvent[]): Promise<PersistResult>;
   recordErrors(errors: EventErrorRecord[]): Promise<void>;
-  upsertSession(event: IDEEvent): Promise<void>;
+  upsertSession(event: IDEEvent, eventCount: number): Promise<void>;
   healthCheck(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -142,15 +142,25 @@ export class PostgresEventStore implements EventStore {
     }
   }
 
-  /** Maintains the ide_sessions dimension so session-level analytics stay cheap. */
-  async upsertSession(event: IDEEvent): Promise<void> {
+  /**
+   * Maintains the ide_sessions dimension so session-level analytics stay
+   * cheap. `eventCount` is the number of events just persisted for this
+   * session, so one call per batch keeps the running total accurate.
+   *
+   * Note this is not idempotent under redelivery: a replayed batch inflates
+   * event_count even though raw_events correctly no-ops. That is an accepted
+   * trade -- the dimension is a convenience, and the authoritative count is a
+   * COUNT(*) over raw_events.
+   */
+  async upsertSession(event: IDEEvent, eventCount: number): Promise<void> {
     await this.pool.query(
       `INSERT INTO ide_sessions (external_id, ide_name, ide_version, started_at, event_count)
-       VALUES ($1, $2, $3, $4, 1)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (external_id) DO UPDATE
-         SET event_count = ide_sessions.event_count + 1,
-             ended_at = GREATEST(COALESCE(ide_sessions.ended_at, $4), $4)`,
-      [event.session_id, event.ide.name, event.ide.version ?? null, event.timestamp]
+         SET event_count = ide_sessions.event_count + EXCLUDED.event_count,
+             started_at = LEAST(ide_sessions.started_at, EXCLUDED.started_at),
+             ended_at = GREATEST(COALESCE(ide_sessions.ended_at, EXCLUDED.started_at), EXCLUDED.started_at)`,
+      [event.session_id, event.ide.name, event.ide.version ?? null, event.timestamp, eventCount]
     );
   }
 

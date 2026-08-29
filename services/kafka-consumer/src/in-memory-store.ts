@@ -41,10 +41,10 @@ export class InMemoryEventStore implements EventStore {
     this.errors.push(...errors);
   }
 
-  async upsertSession(event: IDEEvent): Promise<void> {
+  async upsertSession(event: IDEEvent, eventCount: number): Promise<void> {
     const existing = this.sessions.get(event.session_id);
     this.sessions.set(event.session_id, {
-      count: (existing?.count ?? 0) + 1,
+      count: (existing?.count ?? 0) + eventCount,
       lastSeen: event.timestamp,
     });
   }

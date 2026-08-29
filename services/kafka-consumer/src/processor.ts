@@ -154,6 +154,30 @@ export class EventProcessor {
         });
       }
 
+      // Maintain the ide_sessions dimension. Done once per distinct session in
+      // the batch rather than per event, so a 200-event batch from one IDE
+      // window costs one write, not two hundred. Never allowed to fail the
+      // batch: the events are already durably stored, and losing a dimension
+      // row is recoverable from raw_events.
+      const sessionRepresentatives = new Map<string, { event: IDEEvent; count: number }>();
+      for (const event of deduped) {
+        const existing = sessionRepresentatives.get(event.session_id);
+        if (!existing) {
+          sessionRepresentatives.set(event.session_id, { event, count: 1 });
+        } else {
+          existing.count += 1;
+          if (event.timestamp > existing.event.timestamp) existing.event = event;
+        }
+      }
+      for (const { event, count } of sessionRepresentatives.values()) {
+        await this.options.store.upsertSession(event, count).catch((err) =>
+          this.options.logger.warn("failed to upsert session dimension", {
+            session_id: event.session_id,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
+
       if (this.options.publishToProcessedTopic) {
         await this.options
           .publishToProcessedTopic(deduped)

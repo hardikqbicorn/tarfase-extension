@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
+import { createHash } from "crypto";
 import jwt from "jsonwebtoken";
 import { Logger } from "@ide-collector/shared-utils";
 import { buildApiApp } from "./app";
@@ -181,6 +182,39 @@ describe("installation registration", () => {
       payload: {},
     });
     expect(response.statusCode).toBe(400);
+  });
+
+  it("stores the hash of the token it actually issued", async () => {
+    // Regression guard: an earlier version signed a placeholder token, stored
+    // its hash, then re-signed with the real installation id - leaving the
+    // stored hash pointing at a token that was never issued, so revocation
+    // lookup and audit by token hash could never match.
+    const code = await issueCode();
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/installations/register",
+      payload: { enrollment_code: code, ide_name: "vscode" },
+    });
+
+    const body = response.json();
+    const expectedHash = createHash("sha256").update(body.installation_token).digest("hex");
+    const stored = ctx.repository.installationTokenHashes.get(body.installation_id);
+
+    expect(stored).toBe(expectedHash);
+  });
+
+  it("issues a token whose subject is the persisted installation id", async () => {
+    const code = await issueCode();
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/installations/register",
+      payload: { enrollment_code: code, ide_name: "vscode" },
+    });
+
+    const body = response.json();
+    const claims = jwt.verify(body.installation_token, JWT_SECRET) as Record<string, unknown>;
+    expect(claims.sub).toBe(body.installation_id);
+    expect(ctx.repository.installations.has(body.installation_id)).toBe(true);
   });
 
   it("never stores the plaintext installation token", async () => {

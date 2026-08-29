@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import jwt from "jsonwebtoken";
 import { Logger, MetricsRegistry } from "@ide-collector/shared-utils";
@@ -140,15 +140,24 @@ export function buildApiApp(deps: ApiAppDependencies): FastifyInstance {
       return { error: "enrollment_code is required" };
     }
 
-    // The token is a JWT so the ingestion service can verify it statelessly;
-    // its hash is stored so it can be revoked and audited.
-    const installationToken = jwt.sign({ user_id: userId }, config.jwtSecret, {
-      algorithm: "HS256",
-      expiresIn: config.tokenTtlSeconds,
-      subject: "pending",
-    });
+    // The installation id is generated here rather than by the database, so
+    // the token can be signed once with the correct `sub` AND the hash stored
+    // alongside it is the hash of the token actually issued. Signing a
+    // placeholder first and re-signing after the insert would leave the stored
+    // hash pointing at a token that never existed, breaking revocation lookup
+    // and audit.
+    const installationId = randomUUID();
+
+    // A JWT so the ingestion service can verify it statelessly; only its hash
+    // is persisted, so a database compromise yields no usable credential.
+    const installationToken = jwt.sign(
+      { user_id: userId, ide_name: body.ide_name },
+      config.jwtSecret,
+      { algorithm: "HS256", expiresIn: config.tokenTtlSeconds, subject: installationId }
+    );
 
     const installation = await repository.createInstallation({
+      id: installationId,
       userId: userId!,
       ideName: body.ide_name,
       ideVersion: body.ide_version,
@@ -157,14 +166,6 @@ export function buildApiApp(deps: ApiAppDependencies): FastifyInstance {
       platform: body.platform,
       tokenHash: sha256(installationToken),
     });
-
-    // Re-sign with the real installation id now that the row exists, so the
-    // ingestion service can trust `sub` as the installation identity.
-    const finalToken = jwt.sign(
-      { user_id: userId, ide_name: body.ide_name },
-      config.jwtSecret,
-      { algorithm: "HS256", expiresIn: config.tokenTtlSeconds, subject: installation.id }
-    );
 
     registrations.inc({ ide_name: body.ide_name });
     logger.info("installation registered", {
@@ -175,7 +176,7 @@ export function buildApiApp(deps: ApiAppDependencies): FastifyInstance {
     reply.code(201);
     return {
       installation_id: installation.id,
-      installation_token: finalToken,
+      installation_token: installationToken,
       user_id: userId,
       expires_in: config.tokenTtlSeconds,
     };

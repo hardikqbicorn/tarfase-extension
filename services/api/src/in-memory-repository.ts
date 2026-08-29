@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import {
   ApiRepository,
+  CreateInstallationInput,
   EnrollmentCodeRecord,
   InstallationRecord,
   UserRecord,
@@ -14,6 +15,8 @@ import {
 export class InMemoryApiRepository implements ApiRepository {
   users = new Map<string, UserRecord>();
   installations = new Map<string, InstallationRecord>();
+  /** installation id -> stored token hash, mirroring the installations.token_hash column. */
+  installationTokenHashes = new Map<string, string>();
   enrollmentCodes = new Map<string, EnrollmentCodeRecord>();
   events: Record<string, unknown>[] = [];
   healthy = true;
@@ -51,15 +54,9 @@ export class InMemoryApiRepository implements ApiRepository {
     return record;
   }
 
-  async createInstallation(input: {
-    userId: string;
-    ideName: string;
-    ideVersion?: string;
-    machineId?: string;
-    tokenHash: string;
-  }): Promise<InstallationRecord> {
+  async createInstallation(input: CreateInstallationInput): Promise<InstallationRecord> {
     const installation: InstallationRecord = {
-      id: randomUUID(),
+      id: input.id,
       user_id: input.userId,
       ide_name: input.ideName,
       ide_version: input.ideVersion ?? null,
@@ -67,6 +64,7 @@ export class InMemoryApiRepository implements ApiRepository {
       revoked_at: null,
     };
     this.installations.set(installation.id, installation);
+    this.installationTokenHashes.set(installation.id, input.tokenHash);
     return installation;
   }
 

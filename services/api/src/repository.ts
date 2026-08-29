@@ -22,6 +22,22 @@ export interface EnrollmentCodeRecord {
   consumed_at: string | null;
 }
 
+export interface CreateInstallationInput {
+  /**
+   * Caller-generated UUID. The id is chosen before insert so the installation
+   * token can be signed with the correct `sub` and its hash stored in the same
+   * row, keeping the stored hash and the issued token in agreement.
+   */
+  id: string;
+  userId: string;
+  ideName: string;
+  ideVersion?: string;
+  extensionVersion?: string;
+  machineId?: string;
+  platform?: string;
+  tokenHash: string;
+}
+
 /**
  * Data access seam. The Postgres implementation is used in production; tests
  * substitute an in-memory implementation so the auth logic is verifiable
@@ -32,15 +48,7 @@ export interface ApiRepository {
   getUser(userId: string): Promise<UserRecord | undefined>;
   createEnrollmentCode(userId: string, codeHash: string, expiresAt: Date): Promise<void>;
   consumeEnrollmentCode(codeHash: string): Promise<EnrollmentCodeRecord | undefined>;
-  createInstallation(input: {
-    userId: string;
-    ideName: string;
-    ideVersion?: string;
-    extensionVersion?: string;
-    machineId?: string;
-    platform?: string;
-    tokenHash: string;
-  }): Promise<InstallationRecord>;
+  createInstallation(input: CreateInstallationInput): Promise<InstallationRecord>;
   getInstallation(installationId: string): Promise<InstallationRecord | undefined>;
   revokeInstallation(installationId: string): Promise<boolean>;
   touchInstallation(installationId: string): Promise<void>;
@@ -107,21 +115,14 @@ export class PostgresApiRepository implements ApiRepository {
     return result.rows[0];
   }
 
-  async createInstallation(input: {
-    userId: string;
-    ideName: string;
-    ideVersion?: string;
-    extensionVersion?: string;
-    machineId?: string;
-    platform?: string;
-    tokenHash: string;
-  }): Promise<InstallationRecord> {
+  async createInstallation(input: CreateInstallationInput): Promise<InstallationRecord> {
     const result = await this.pool.query<InstallationRecord>(
       `INSERT INTO installations
-         (user_id, ide_name, ide_version, extension_version, machine_id, platform, token_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (id, user_id, ide_name, ide_version, extension_version, machine_id, platform, token_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, user_id, ide_name, ide_version, machine_id, revoked_at`,
       [
+        input.id,
         input.userId,
         input.ideName,
         input.ideVersion ?? null,
