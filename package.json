@@ -18,15 +18,16 @@
     "dev:producer": "npm run dev -w services/kafka-producer",
     "dev:consumer": "npm run dev -w services/kafka-consumer",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down -v"
+    "docker:down": "docker compose down -v",
+    "test:db": "./scripts/test-db.sh"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "vitest": "^2.0.5",
     "@types/node": "^20.14.15",
-    "zod": "^3.23.8",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.5.4",
     "uuid": "^9.0.1",
-    "@types/uuid": "^9.0.8"
+    "vitest": "^2.0.5",
+    "zod": "^3.23.8"
   },
   "engines": {
     "node": ">=18.0.0"
