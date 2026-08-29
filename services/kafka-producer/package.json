@@ -1,0 +1,28 @@
+{
+  "name": "@ide-collector/kafka-producer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP ingestion service: authenticates installations, validates events, and produces them to Kafka idempotently.",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ide-collector/event-schema": "*",
+    "@ide-collector/crypto": "*",
+    "@ide-collector/shared-utils": "*",
+    "fastify": "^4.28.1",
+    "kafkajs": "^2.2.4",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "tsx": "^4.17.0",
+    "vitest": "^2.0.5",
+    "@types/node": "^20.14.15",
+    "@types/jsonwebtoken": "^9.0.6"
+  }
+}

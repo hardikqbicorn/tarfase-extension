@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+build/
+*.vsix
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+.vscode-test/
+*.tsbuildinfo
+.idea/
+*.iml

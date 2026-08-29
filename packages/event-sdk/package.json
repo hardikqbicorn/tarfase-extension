@@ -1,0 +1,21 @@
+{
+  "name": "@ide-collector/event-sdk",
+  "version": "0.1.0",
+  "description": "IDE-agnostic event collection SDK: buffering, batching, retry, redaction, and transport. Every extension adapter (VS Code, Cursor, Windsurf, JetBrains) wraps this SDK.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ide-collector/event-schema": "*",
+    "@ide-collector/crypto": "*",
+    "@ide-collector/shared-utils": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "@types/node": "^20.14.15"
+  }
+}
