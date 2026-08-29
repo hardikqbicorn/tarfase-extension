@@ -1,0 +1,38 @@
+<idea-plugin>
+    <id>com.idecollector.ide-event-collector</id>
+    <name>IDE Event Collector</name>
+    <vendor>ide-collector</vendor>
+
+    <description><![CDATA[
+        Collects IDE activity events and ships them to the Universal IDE Event
+        Collection Platform, using the same canonical event schema as the
+        VS Code, Cursor, and Windsurf adapters.
+
+        Collection is strictly opt-in and stays off until enabled in
+        Settings &rarr; Tools &rarr; IDE Event Collector.
+    ]]></description>
+
+    <!-- Works across the whole IntelliJ Platform family: IDEA, PyCharm,
+         GoLand, WebStorm, RubyMine, CLion, Rider, Android Studio. -->
+    <depends>com.intellij.modules.platform</depends>
+    <!-- Git4Idea is optional: without it, git events report as unavailable
+         rather than preventing the plugin from loading. -->
+    <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.idecollector.settings.CollectorSettings"/>
+        <projectService serviceImplementation="com.idecollector.CollectorService"/>
+    </extensions>
+
+    <projectListeners>
+        <listener
+            class="com.idecollector.listeners.CollectorFileEditorListener"
+            topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+
+    <applicationListeners>
+        <listener
+            class="com.idecollector.listeners.CollectorSaveListener"
+            topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"/>
+    </applicationListeners>
+</idea-plugin>

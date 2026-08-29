@@ -1,0 +1,8 @@
+<idea-plugin>
+    <!--
+      Loaded only when Git4Idea is present. Git repository state is read
+      reflectively in CollectorService, so this file exists to make the
+      optional dependency explicit; git-specific listeners are registered here
+      as they are implemented.
+    -->
+</idea-plugin>
