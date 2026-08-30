@@ -5,7 +5,7 @@ services:
   # Kafka (KRaft mode - no ZooKeeper)
   # ---------------------------------------------------------------------------
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnamilegacy/kafka:3.7
     container_name: ide-collector-kafka
     ports:
       - "9092:9092"
@@ -36,7 +36,7 @@ services:
   # Creates the platform's topics with the right partition counts and retention,
   # then exits. Everything else waits on it so no service races topic creation.
   kafka-init:
-    image: bitnami/kafka:3.7
+    image: bitnamilegacy/kafka:3.7
     container_name: ide-collector-kafka-init
     depends_on:
       kafka:
