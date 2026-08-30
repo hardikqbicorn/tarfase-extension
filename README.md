@@ -30,7 +30,7 @@ layer, consumer, and database do not change.
 | Supabase schema + migrations | Complete, partitioned, RLS |
 | Registration / auth flow | Complete |
 | Docker Compose environment | Complete |
-| Tests | 166 unit + 10 integration, all passing |
+| Tests | 175 unit + 10 integration, all passing |
 
 **Verified:** the full path — capture → local buffer → ingestion → Kafka →
 consumer → database — runs green against real PostgreSQL 16, including
@@ -283,7 +283,7 @@ Before deploying, work through the checklist in
 ## Testing
 
 ```bash
-npm test                  # 166 unit + 10 integration tests
+npm test                  # 175 unit + 10 integration tests
 npm run test:db           # integration suite against a real PostgreSQL instance
 npm run typecheck         # tsc -b across the monorepo
 ```

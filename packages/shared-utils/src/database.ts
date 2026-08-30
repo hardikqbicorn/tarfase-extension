@@ -128,6 +128,95 @@ export function readCaCertFromEnv(
   return undefined;
 }
 
+export interface DatabaseErrorDescription {
+  /** Short reason, safe to return to a client. */
+  summary: string;
+  /** Operator-facing remedy. Logged, never returned to a client. */
+  remedy: string;
+}
+
+/**
+ * Maps a driver-level connection failure to a human remedy.
+ *
+ * Raw driver errors are actively misleading here: an IPv6-only Supabase host
+ * surfaces as `ENETUNREACH <ipv6>:5432`, which reads like a network outage
+ * rather than "this host has no A record and containers have no IPv6". The
+ * remedies below name the actual fix.
+ *
+ * The summary is deliberately generic - it is safe to return to an extension -
+ * while the remedy (which can name hosts and addresses) is for logs only.
+ */
+export function describeDatabaseError(err: unknown): DatabaseErrorDescription | undefined {
+  const code = (err as { code?: string })?.code ?? "";
+  const message = err instanceof Error ? err.message : String(err ?? "");
+
+  if (code === "ENETUNREACH" || code === "EHOSTUNREACH" || /ENETUNREACH|EHOSTUNREACH/.test(message)) {
+    const looksIpv6 = /:[0-9a-f]*:[0-9a-f]*:/i.test(message);
+    return {
+      summary: "The service cannot reach the database.",
+      remedy: looksIpv6
+        ? [
+            "The database resolved to an IPv6 address and this host has no IPv6 route.",
+            "Docker containers have no IPv6 by default, which is why this works from",
+            "your shell but not from a container.",
+            "",
+            "Fix: use Supabase's Session pooler (IPv4) in DATABASE_URL:",
+            "  Project Settings -> Database -> Connection string -> Session pooler",
+            "  postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres",
+            "The user becomes postgres.<project-ref>, not plain postgres.",
+          ].join("\n")
+        : "The database host is unreachable from this network.",
+    };
+  }
+
+  if (code === "ENOTFOUND" || /ENOTFOUND|EAI_AGAIN/.test(message)) {
+    return {
+      summary: "The service cannot resolve the database host.",
+      remedy: "DATABASE_URL names a host that does not resolve. Check it for typos.",
+    };
+  }
+
+  if (code === "ECONNREFUSED" || /ECONNREFUSED/.test(message)) {
+    return {
+      summary: "The database refused the connection.",
+      remedy:
+        "Nothing is listening there. Against Supabase this is usually the wrong port " +
+        "(5432 direct/session pooler, 6543 transaction pooler) or a paused project.",
+    };
+  }
+
+  if (/self.signed|unable to verify|certificate/i.test(message)) {
+    return {
+      summary: "The service could not establish a secure database connection.",
+      remedy: [
+        "TLS certificate verification failed. Supabase signs its database",
+        "certificates with its own CA, which is not in the system trust store.",
+        "Set DATABASE_CA_CERT_FILE to the downloaded CA (Project Settings ->",
+        "Database -> SSL configuration), or DATABASE_SSL=require to skip",
+        "verification.",
+      ].join("\n"),
+    };
+  }
+
+  if (/password authentication failed|SASL|SCRAM/i.test(message)) {
+    return {
+      summary: "The service could not authenticate to the database.",
+      remedy:
+        "Check the password in DATABASE_URL. With the pooler the user must be " +
+        "postgres.<project-ref>. Percent-encode special characters (@ -> %40).",
+    };
+  }
+
+  if (/timeout|ETIMEDOUT/i.test(message)) {
+    return {
+      summary: "The database connection timed out.",
+      remedy: "The host may be firewalled, paused, or unreachable from this network.",
+    };
+  }
+
+  return undefined;
+}
+
 /** Redacts the password so a connection string is safe to log. */
 export function redactDatabaseUrl(databaseUrl: string): string {
   try {

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import jwt from "jsonwebtoken";
-import { Logger, MetricsRegistry } from "@ide-collector/shared-utils";
+import { describeDatabaseError, Logger, MetricsRegistry } from "@ide-collector/shared-utils";
 import { ApiServiceConfig } from "./config";
 import { ApiRepository } from "./repository";
 
@@ -42,6 +42,41 @@ export function buildApiApp(deps: ApiAppDependencies): FastifyInstance {
   );
 
   const app = Fastify({ logger: false, trustProxy: true });
+
+  /**
+   * Turns an unhandled failure into a useful response.
+   *
+   * Two things matter here. A database outage is a 503, not a 500: it is
+   * transient and the client should retry rather than treat the request as
+   * malformed. And the raw driver error never reaches the client - it names
+   * the database host and IP, which an IDE extension has no business seeing.
+   * The operator-facing remedy goes to the logs instead.
+   */
+  app.setErrorHandler((error, request, reply) => {
+    const described = describeDatabaseError(error);
+
+    if (described) {
+      logger.error("database unavailable", {
+        route: request.url,
+        code: (error as { code?: string }).code,
+        error: error.message,
+        remedy: described.remedy,
+      });
+      reply.code(503);
+      return reply.send({
+        error: described.summary,
+        detail: "The service is temporarily unable to reach its database. Retry shortly.",
+      });
+    }
+
+    logger.error("unhandled request error", {
+      route: request.url,
+      error: error.message,
+      stack: error.stack,
+    });
+    reply.code(error.statusCode && error.statusCode < 500 ? error.statusCode : 500);
+    return reply.send({ error: "Internal Server Error" });
+  });
 
   const requireAdmin = (header: string | undefined): boolean => {
     if (!header) return false;
