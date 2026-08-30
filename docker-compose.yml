@@ -61,12 +61,20 @@ services:
       DYNAMIC_CONFIG_ENABLED: "true"
 
   # ---------------------------------------------------------------------------
-  # Postgres (Supabase-compatible: the same schema applies to a real Supabase
-  # project; only the connection string changes)
+  # Optional local Postgres.
+  #
+  # The default target is Supabase (set DATABASE_URL in .env). This service is
+  # behind a profile, so it only starts when explicitly asked for:
+  #
+  #   docker compose --profile local-db up
+  #
+  # Migrations are applied here on first boot; against Supabase, run
+  # ./scripts/migrate.sh instead.
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: ide-collector-postgres
+    profiles: ["local-db"]
     ports:
       - "5432:5432"
     environment:
@@ -94,14 +102,19 @@ services:
     container_name: ide-collector-api
     ports:
       - "8081:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    env_file:
+      # Optional: a fresh clone with no .env still starts (against the
+      # local-db profile). Supabase settings live here.
+      - path: .env
+        required: false
     environment:
       NODE_ENV: development
       PORT: "8081"
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ide_events
+      # Defaults to Supabase via .env. Falls back to the local-db profile's
+      # Postgres only if DATABASE_URL is unset.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ide_events}
+      DATABASE_SSL: ${DATABASE_SSL:-}
       # Dev-only defaults. Override via a .env file (see .env.example) or real
       # secrets management before deploying anywhere real.
       JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-secret}
@@ -121,6 +134,11 @@ services:
     container_name: ide-collector-ingestion
     ports:
       - "8080:8080"
+    env_file:
+      # Optional: a fresh clone with no .env still starts (against the
+      # local-db profile). Supabase settings live here.
+      - path: .env
+        required: false
     depends_on:
       kafka:
         condition: service_healthy
@@ -153,8 +171,11 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
+    env_file:
+      # Optional: a fresh clone with no .env still starts (against the
+      # local-db profile). Supabase settings live here.
+      - path: .env
+        required: false
     environment:
       NODE_ENV: development
       PORT: "8082"
@@ -164,7 +185,8 @@ services:
       KAFKA_TOPIC_RAW: ide.events.raw
       KAFKA_TOPIC_ERRORS: ide.events.errors
       KAFKA_TOPIC_PROCESSED: ide.events.processed
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ide_events
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ide_events}
+      DATABASE_SSL: ${DATABASE_SSL:-}
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:8082/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s

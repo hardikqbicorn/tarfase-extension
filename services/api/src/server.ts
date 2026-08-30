@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { Logger } from "@ide-collector/shared-utils";
+import { Logger, redactDatabaseUrl, resolveDatabaseSsl } from "@ide-collector/shared-utils";
 import { loadConfig } from "./config";
 import { PostgresApiRepository } from "./repository";
 import { buildApiApp } from "./app";
@@ -8,16 +8,24 @@ async function main() {
   const config = loadConfig();
   const logger = new Logger({ service: "api", level: config.logLevel });
 
+  // TLS is decided from the connection target, not from NODE_ENV: a managed
+  // database (Supabase, RDS, Neon) needs TLS whether or not this happens to be
+  // running in "development".
+  const ssl = resolveDatabaseSsl({
+    databaseUrl: config.databaseUrl,
+    mode: config.databaseSslMode,
+    caCert: config.databaseCaCert,
+  });
+
+  logger.info("connecting to database", {
+    url: redactDatabaseUrl(config.databaseUrl),
+    tls: ssl === false ? "disabled" : ssl.rejectUnauthorized ? "verified" : "unverified",
+  });
+
   const pool = new Pool({
     connectionString: config.databaseUrl,
-    max: 10,
-    // Supabase and most managed Postgres providers require TLS. `rejectUnauthorized`
-    // stays on unless the operator explicitly opts out for a self-signed dev cert.
-    ssl: config.databaseUrl.includes("sslmode=disable")
-      ? false
-      : config.nodeEnv === "production"
-        ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false" }
-        : false,
+    max: config.databasePoolSize,
+    ssl,
   });
 
   const repository = new PostgresApiRepository(pool);

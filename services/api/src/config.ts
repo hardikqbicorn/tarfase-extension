@@ -25,6 +25,11 @@ export interface ApiServiceConfig {
   tokenTtlSeconds: number;
   enrollmentCodeTtlSeconds: number;
   databaseUrl: string;
+  databasePoolSize: number;
+  /** DATABASE_SSL: disable | require | no-verify | verify. Omit to auto-detect from the host. */
+  databaseSslMode?: string;
+  /** PEM CA bundle for a provider using a private certificate authority. */
+  databaseCaCert?: string;
   /** Guards the operator-only endpoints (enrollment code issuance, revocation). */
   adminApiKey: string;
   /**
@@ -49,6 +54,9 @@ export function loadConfig(): ApiServiceConfig {
     databaseUrl: isProd
       ? required("DATABASE_URL")
       : optional("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ide_events"),
+    databasePoolSize: optionalInt("DATABASE_POOL_SIZE", 10),
+    databaseSslMode: process.env.DATABASE_SSL,
+    databaseCaCert: process.env.DATABASE_CA_CERT,
     adminApiKey: isProd ? required("ADMIN_API_KEY") : optional("ADMIN_API_KEY", "dev-admin-key"),
     allowOpenEnrollment: isProd ? false : optional("ALLOW_OPEN_ENROLLMENT", "true") === "true",
   };

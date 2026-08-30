@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { Pool } from "pg";
-import { Logger } from "@ide-collector/shared-utils";
+import { Logger, redactDatabaseUrl, resolveDatabaseSsl } from "@ide-collector/shared-utils";
 import { loadConfig } from "./config";
 import { PostgresEventStore } from "./store";
 import { EventProcessor } from "./processor";
@@ -12,13 +12,24 @@ async function main() {
   const logger = new Logger({ service: "kafka-consumer", level: config.logLevel });
   const metrics = createConsumerMetrics();
 
+  // TLS is decided from the connection target, not from NODE_ENV: a managed
+  // database (Supabase, RDS, Neon) needs TLS whether or not this happens to be
+  // running in "development".
+  const ssl = resolveDatabaseSsl({
+    databaseUrl: config.databaseUrl,
+    mode: config.databaseSslMode,
+    caCert: config.databaseCaCert,
+  });
+
+  logger.info("connecting to database", {
+    url: redactDatabaseUrl(config.databaseUrl),
+    tls: ssl === false ? "disabled" : ssl.rejectUnauthorized ? "verified" : "unverified",
+  });
+
   const pool = new Pool({
     connectionString: config.databaseUrl,
     max: config.databasePoolSize,
-    ssl:
-      config.nodeEnv === "production" && !config.databaseUrl.includes("sslmode=disable")
-        ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false" }
-        : false,
+    ssl,
   });
 
   const store = new PostgresEventStore(pool);

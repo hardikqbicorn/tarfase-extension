@@ -70,6 +70,10 @@ export interface ConsumerServiceConfig {
 
   databaseUrl: string;
   databasePoolSize: number;
+  /** DATABASE_SSL: disable | require | no-verify | verify. Omit to auto-detect from the host. */
+  databaseSslMode?: string;
+  /** PEM CA bundle for a provider using a private certificate authority. */
+  databaseCaCert?: string;
   /** Rows per INSERT. Large batches amortize round-trips; too large blows past statement limits. */
   writeBatchSize: number;
   /** Publish successfully persisted events to ide.events.processed for downstream consumers. */
@@ -105,6 +109,8 @@ export function loadConfig(): ConsumerServiceConfig {
       ? required("DATABASE_URL")
       : optional("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ide_events"),
     databasePoolSize: optionalInt("DATABASE_POOL_SIZE", 10),
+    databaseSslMode: process.env.DATABASE_SSL,
+    databaseCaCert: process.env.DATABASE_CA_CERT,
     writeBatchSize: optionalInt("WRITE_BATCH_SIZE", 200),
     emitProcessedEvents: optionalBool("EMIT_PROCESSED_EVENTS", false),
   };

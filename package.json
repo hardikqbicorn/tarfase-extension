@@ -19,11 +19,16 @@
     "dev:consumer": "npm run dev -w services/kafka-consumer",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down -v",
-    "test:db": "./scripts/test-db.sh"
+    "test:db": "./scripts/test-db.sh",
+    "migrate": "tsx scripts/migrate.ts",
+    "check:db": "tsx scripts/check-db.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.15",
+    "@types/pg": "^8.23.1",
     "@types/uuid": "^9.0.8",
+    "pg": "^8.23.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.4",
     "uuid": "^9.0.1",
     "vitest": "^2.0.5",

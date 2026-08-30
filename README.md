@@ -45,14 +45,26 @@ Docker daemon available).
 
 ## Quick start
 
+Default topology: **Kafka in Docker, events persisted to Supabase.**
+
 ```bash
 git clone <repo> && cd universal-ide-event-collector
 npm install
+
+cp .env.example .env      # set DATABASE_URL to your Supabase Session pooler string
+npm run migrate           # apply the schema to Supabase
+npm run check:db          # verify connectivity, schema, and the write path
+
 docker compose up --build
 ```
 
-That brings up Kafka (KRaft), Kafka UI, PostgreSQL with migrations applied, and
-the three services:
+> **Use Supabase's Session pooler, not the direct connection.**
+> `db.<ref>.supabase.co` is IPv6-only unless you have the IPv4 add-on, and
+> Docker containers have no IPv6 by default — so it works from your shell and
+> fails from a container. `npm run check:db` detects this and names the fix.
+> Details in [`docs/supabase-setup.md`](docs/supabase-setup.md).
+
+That brings up Kafka (KRaft), Kafka UI, and the three services:
 
 | Service | URL |
 | --- | --- |
@@ -60,12 +72,20 @@ the three services:
 | Control-plane API | http://localhost:8081 |
 | Consumer (metrics) | http://localhost:8082 |
 | Kafka UI | http://localhost:8090 |
-| PostgreSQL | `postgresql://postgres:postgres@localhost:5432/ide_events` |
 
 Verify:
 
 ```bash
 curl localhost:8080/health && curl localhost:8081/health && curl localhost:8082/ready
+```
+
+### Prefer a fully local stack?
+
+Local PostgreSQL is still available behind a Compose profile — it does not
+start by default:
+
+```bash
+docker compose --profile local-db up --build   # with DATABASE_URL unset
 ```
 
 ### Running the VS Code extension
@@ -88,9 +108,13 @@ In the launched window:
 
 ### Seeing the events land
 
-```bash
-docker compose exec postgres psql -U postgres -d ide_events -c \
-  "SELECT event_type, ide_name, file_path, \"timestamp\" FROM raw_events ORDER BY \"timestamp\" DESC LIMIT 10;"
+In the Supabase SQL editor:
+
+```sql
+select event_type, ide_name, file_path, "timestamp"
+from raw_events
+order by "timestamp" desc
+limit 20;
 ```
 
 Or watch `ide.events.raw` in Kafka UI at http://localhost:8090.
@@ -285,6 +309,7 @@ matching semantics, so `npm test` works anywhere.
 
 | Document | Contents |
 | --- | --- |
+| [`docs/supabase-setup.md`](docs/supabase-setup.md) | Supabase connection, migrations, the IPv6 gotcha, troubleshooting |
 | [`docs/architecture.md`](docs/architecture.md) | Data flow, component responsibilities, reliability, scaling |
 | [`docs/event-schema.md`](docs/event-schema.md) | Envelope, versioning rules, full event catalog, DB mapping |
 | [`docs/api.md`](docs/api.md) | HTTP endpoints, auth, status codes, metrics |
@@ -293,16 +318,15 @@ matching semantics, so `npm test` works anywhere.
 
 ---
 
-## Using Supabase instead of local PostgreSQL
+## Database commands
 
-1. Create a project.
-2. Apply `database/supabase/migrations/*.sql` in order (SQL editor or
-   `supabase db push`).
-3. Point the consumer and API at it:
+| Command | What it does |
+| --- | --- |
+| `npm run migrate` | Applies migrations to `DATABASE_URL` (works against Supabase) |
+| `npm run migrate -- --dry-run` | Shows what would be applied, changes nothing |
+| `npm run check:db` | Diagnoses DNS, TLS, schema, and the write path |
+| `npm run test:db` | Runs the integration suite against a throwaway local PostgreSQL |
 
-```bash
-DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
-```
-
-Connect as the **service role** — the consumer must write past RLS, and it
-should be the only thing that can.
+Migrations are tracked in `schema_migrations`, so re-running is safe. The
+runner refuses to proceed if an already-applied migration has been edited,
+rather than letting the database and the repo diverge silently.
