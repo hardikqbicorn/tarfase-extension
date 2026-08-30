@@ -16,7 +16,7 @@ import { createHash } from "crypto";
 import { readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { Client } from "pg";
-import { redactDatabaseUrl, resolveDatabaseSsl } from "../packages/shared-utils/src";
+import { readCaCertFromEnv, redactDatabaseUrl, resolveDatabaseSsl } from "../packages/shared-utils/src";
 import { loadDotEnv, requireDatabaseUrl } from "./env";
 
 loadDotEnv();
@@ -49,7 +49,7 @@ async function main() {
   const ssl = resolveDatabaseSsl({
     databaseUrl,
     mode: process.env.DATABASE_SSL,
-    caCert: process.env.DATABASE_CA_CERT,
+    caCert: readCaCertFromEnv(),
   });
 
   console.log(`==> Target:  ${redactDatabaseUrl(databaseUrl)}`);

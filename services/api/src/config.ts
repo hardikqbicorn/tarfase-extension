@@ -1,3 +1,5 @@
+import { readCaCertFromEnv } from "@ide-collector/shared-utils";
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -56,7 +58,7 @@ export function loadConfig(): ApiServiceConfig {
       : optional("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ide_events"),
     databasePoolSize: optionalInt("DATABASE_POOL_SIZE", 10),
     databaseSslMode: process.env.DATABASE_SSL,
-    databaseCaCert: process.env.DATABASE_CA_CERT,
+    databaseCaCert: readCaCertFromEnv(),
     adminApiKey: isProd ? required("ADMIN_API_KEY") : optional("ADMIN_API_KEY", "dev-admin-key"),
     allowOpenEnrollment: isProd ? false : optional("ALLOW_OPEN_ENROLLMENT", "true") === "true",
   };

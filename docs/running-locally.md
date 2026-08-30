@@ -67,6 +67,19 @@ ADMIN_API_KEY=<openssl rand -hex 32>
 > Percent-encode special characters in the password: `@` → `%40`, `#` → `%23`,
 > `/` → `%2F`.
 
+**You will also hit a TLS error on the first connection**
+(`self-signed certificate in certificate chain`) — Supabase signs its database
+certificates with its own CA. Download it from **Project Settings → Database →
+SSL configuration**, save it as `certs/supabase-ca.crt`, and add:
+
+```bash
+DATABASE_CA_CERT_FILE=./certs/supabase-ca.crt      # host commands
+DATABASE_CA_CERT_FILE=/app/certs/supabase-ca.crt   # Dockerised services
+```
+
+Or, to get moving immediately with encryption but no verification:
+`DATABASE_SSL=require`.
+
 ---
 
 ## 3. Create the schema in Supabase
@@ -231,7 +244,7 @@ your host it is `localhost:9092`.
 ## Tests
 
 ```bash
-npm test              # 168 tests, no database or Kafka needed
+npm test              # 176 tests, no database or Kafka needed
 npm run test:db       # integration suite against a throwaway local PostgreSQL
 npm run typecheck     # tsc -b across the monorepo
 ```
@@ -240,6 +253,29 @@ npm run typecheck     # tsc -b across the monorepo
 and falls back to an in-memory store when `TEST_DATABASE_URL` is unset.
 
 ---
+
+## Optional: Python tooling
+
+If you would rather poke at the database from Python, there is a psycopg2
+equivalent of `check:db`:
+
+```bash
+pip install -r scripts/requirements.txt
+python3 scripts/check_db.py
+```
+
+Install **psycopg2-binary**, not `psycopg2` — the latter compiles from source
+and needs libpq plus build tools, which commonly fails on macOS.
+
+One thing this makes visible: a bare `psycopg2.connect(DATABASE_URL)` succeeds
+against Supabase where the Node services report a certificate error. That is
+because libpq defaults to `sslmode=prefer` — encrypted, certificate *not*
+verified — while this project verifies by default. Same encryption, weaker
+guarantee. The script prints the effective `sslmode` so the difference is
+visible rather than mysterious.
+
+The backend services are Node and stay Node; this is a diagnostic and ad-hoc
+query tool, not a second persistence layer.
 
 ## Command reference
 
@@ -250,6 +286,7 @@ and falls back to an in-memory store when `TEST_DATABASE_URL` is unset.
 | `npm run migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run migrate -- --dry-run` | Preview migrations |
 | `npm run check:db` | Diagnose DNS, TLS, schema, write path |
+| `python3 scripts/check_db.py` | Same checks via psycopg2 |
 | `npm test` | Run all tests |
 | `docker compose up --build` | Kafka + services (Supabase for storage) |
 | `docker compose --profile local-db up` | Add local PostgreSQL instead |
@@ -266,6 +303,7 @@ and falls back to an in-memory store when `TEST_DATABASE_URL` is unset.
 | Consumer `/ready` 503, `database: false` | Cannot reach Supabase | `npm run check:db` |
 | Works in shell, fails in Docker | IPv6-only direct host | Switch to the Session pooler |
 | `password authentication failed` | Wrong user or unencoded password | Pooler user is `postgres.<ref>`; encode `@` as `%40` |
+| `self-signed certificate in certificate chain` | Supabase's private CA | Set `DATABASE_CA_CERT_FILE`, or `DATABASE_SSL=require` |
 | `relation "raw_events" does not exist` | Migrations not applied | `npm run migrate` |
 | Extension registers but nothing arrives | Telemetry disabled, or ingestion down | Check "Show Status"; `curl localhost:8080/health` |
 | Extension: "not registered" prompt | No stored credential | Run the Register command |

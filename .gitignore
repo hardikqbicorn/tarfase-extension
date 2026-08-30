@@ -12,3 +12,7 @@ coverage/
 *.tsbuildinfo
 .idea/
 *.iml
+
+# Database CA certificates (downloaded from your provider's dashboard)
+certs/*.crt
+*.crt

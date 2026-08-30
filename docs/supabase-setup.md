@@ -149,10 +149,28 @@ PostgreSQL a table owner bypasses RLS unless `FORCE ROW LEVEL SECURITY` is set
 (it is not). So writes succeed while dashboard/PostgREST reads remain policy-
 constrained. `npm run check:db` proves this rather than assuming it.
 
-**TLS.** Resolved from the connection target, not `NODE_ENV`: remote hosts get
-verified TLS automatically. If verification fails, prefer setting
-`DATABASE_CA_CERT` (Project Settings → Database → SSL configuration) over
-`DATABASE_SSL=require`, which encrypts without verifying.
+**TLS — you will hit this.** Supabase signs database certificates with its own
+CA, which is not in the system trust store, so the first connection fails with
+`self-signed certificate in certificate chain`. The connection is encrypted
+either way; the only question is whether the certificate is *verified*.
+
+Preferred fix — download the CA (Project Settings → Database → SSL
+configuration), save it as `certs/supabase-ca.crt`, and set:
+
+```bash
+DATABASE_CA_CERT_FILE=./certs/supabase-ca.crt      # host commands
+DATABASE_CA_CERT_FILE=/app/certs/supabase-ca.crt   # Dockerised services
+```
+
+`certs/` is mounted into the containers at `/app/certs` and `*.crt` is
+gitignored.
+
+Quick unblock, encrypted but **not** verified: `DATABASE_SSL=require`.
+
+Worth knowing: a `psycopg2` snippet connects to Supabase with no such error,
+because libpq defaults to `sslmode=prefer` — encrypted, certificate unverified.
+That is a weaker default, not a better client. `DATABASE_SSL=require` is this
+project's equivalent of it.
 
 **Connection limits.** The pooler multiplexes, but `DATABASE_POOL_SIZE`
 (default 10) applies per service — the API and consumer each open their own
@@ -176,7 +194,7 @@ Supabase's `auth.users`. If you want them linked, add a foreign key from
 | `ENOTFOUND` / `ENETUNREACH` from containers, works in your shell | IPv6-only direct host | Switch to the Session pooler |
 | `password authentication failed` | Wrong password, or plain `postgres` user with the pooler | Pooler user is `postgres.<ref>`; percent-encode the password |
 | `ECONNREFUSED` | Wrong port, or project paused | 5432 for direct/session, 6543 for transaction |
-| `self signed certificate` / `unable to verify` | CA not in the system bundle | Set `DATABASE_CA_CERT`, or `DATABASE_SSL=require` as a fallback |
+| `self signed certificate` / `unable to verify` | CA not in the system bundle | Set `DATABASE_CA_CERT_FILE`, or `DATABASE_SSL=require` as a fallback |
 | `relation "raw_events" does not exist` | Migrations not applied | `npm run migrate` |
 | Consumer `/ready` returns 503 | Kafka or database not connected | Check the body — it names which |
 | `new row violates row-level security policy` | Connected as a non-owner without BYPASSRLS | Connect as `postgres` or the service role |

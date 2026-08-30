@@ -12,7 +12,7 @@
 import { lookup } from "dns/promises";
 import { randomUUID } from "crypto";
 import { Client } from "pg";
-import { parseDatabaseHost, redactDatabaseUrl, resolveDatabaseSsl } from "../packages/shared-utils/src";
+import { parseDatabaseHost, readCaCertFromEnv, redactDatabaseUrl, resolveDatabaseSsl } from "../packages/shared-utils/src";
 import { loadDotEnv, requireDatabaseUrl } from "./env";
 
 loadDotEnv();
@@ -95,7 +95,7 @@ async function main() {
   const ssl = resolveDatabaseSsl({
     databaseUrl,
     mode: process.env.DATABASE_SSL,
-    caCert: process.env.DATABASE_CA_CERT,
+    caCert: readCaCertFromEnv(),
   });
 
   console.log(`Target: ${redactDatabaseUrl(databaseUrl)}`);
@@ -118,11 +118,18 @@ async function main() {
       fail(
         `TLS verification failed: ${message}`,
         [
-          "The server's certificate did not validate against the system CA bundle.",
-          "Preferred fix: download the CA from the Supabase dashboard",
-          "  (Project Settings -> Database -> SSL configuration) and set",
-          "  DATABASE_CA_CERT to its contents.",
-          "Fallback (encrypted but unverified): DATABASE_SSL=require",
+          "Supabase signs its database certificates with its own CA, which is not",
+          "in the system trust store. The connection is encrypted either way; the",
+          "question is only whether the certificate is verified.",
+          "",
+          "Preferred fix - verify against Supabase's CA:",
+          "  1. Supabase dashboard -> Project Settings -> Database ->",
+          "     SSL configuration -> Download certificate  (prod-ca-*.crt)",
+          "  2. Save it in the repo root as  supabase-ca.crt   (it is gitignored)",
+          "  3. Add to .env:   DATABASE_CA_CERT_FILE=./supabase-ca.crt",
+          "",
+          "Quick unblock - encrypted but NOT verified:",
+          "  DATABASE_SSL=require",
         ].join("\n")
       );
     } else if (/ENETUNREACH|EHOSTUNREACH|ENOTFOUND|EAI_AGAIN/i.test(message)) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseDatabaseHost,
   parseSslMode,
+  readCaCertFromEnv,
   redactDatabaseUrl,
   resolveDatabaseSsl,
 } from "./database";
@@ -84,6 +85,61 @@ describe("parseDatabaseHost / parseSslMode", () => {
   it("extracts sslmode when present", () => {
     expect(parseSslMode(`${LOCAL}?sslmode=require`)).toBe("require");
     expect(parseSslMode(LOCAL)).toBeUndefined();
+  });
+});
+
+describe("readCaCertFromEnv", () => {
+  const PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
+
+  it("returns undefined when neither variable is set", () => {
+    expect(readCaCertFromEnv({})).toBeUndefined();
+  });
+
+  it("reads an inline PEM", () => {
+    expect(readCaCertFromEnv({ DATABASE_CA_CERT: PEM })).toBe(PEM);
+  });
+
+  it("converts literal backslash-n to real newlines, as a .env file forces", () => {
+    const escaped = "-----BEGIN CERTIFICATE-----\\nMIIB\\n-----END CERTIFICATE-----";
+    expect(readCaCertFromEnv({ DATABASE_CA_CERT: escaped })).toBe(PEM);
+  });
+
+  it("reads from a file path", () => {
+    const result = readCaCertFromEnv({ DATABASE_CA_CERT_FILE: "/certs/ca.crt" }, (path) => {
+      expect(path).toBe("/certs/ca.crt");
+      return PEM;
+    });
+    expect(result).toBe(PEM);
+  });
+
+  it("trims whitespace around the path", () => {
+    const result = readCaCertFromEnv({ DATABASE_CA_CERT_FILE: "  /certs/ca.crt  " }, (path) => {
+      expect(path).toBe("/certs/ca.crt");
+      return PEM;
+    });
+    expect(result).toBe(PEM);
+  });
+
+  it("prefers the inline PEM over the file path", () => {
+    const result = readCaCertFromEnv(
+      { DATABASE_CA_CERT: PEM, DATABASE_CA_CERT_FILE: "/certs/ca.crt" },
+      () => {
+        throw new Error("should not read the file");
+      }
+    );
+    expect(result).toBe(PEM);
+  });
+
+  it("ignores an empty value rather than treating it as a certificate", () => {
+    expect(readCaCertFromEnv({ DATABASE_CA_CERT: "   " })).toBeUndefined();
+  });
+
+  it("reports the path when the file cannot be read", () => {
+    expect(() =>
+      readCaCertFromEnv({ DATABASE_CA_CERT_FILE: "/missing/ca.crt" }, () => {
+        throw new Error("ENOENT");
+      })
+    ).toThrow(/\/missing\/ca\.crt/);
   });
 });
 

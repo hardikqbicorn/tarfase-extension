@@ -100,6 +100,13 @@ services:
       dockerfile: infrastructure/docker/Dockerfile
       target: api
     container_name: ide-collector-api
+    volumes:
+      # Certificates directory, mounted read-only. Drop a provider CA here
+      # (e.g. certs/supabase-ca.crt) and point DATABASE_CA_CERT_FILE at
+      # /app/certs/<name>.crt. A directory is mounted rather than a single
+      # file because Docker silently creates a stray directory on the host
+      # when a bind-mounted file is missing.
+      - ./certs:/app/certs:ro
     ports:
       - "8081:8081"
     env_file:
@@ -164,6 +171,13 @@ services:
       dockerfile: infrastructure/docker/Dockerfile
       target: consumer
     container_name: ide-collector-consumer
+    volumes:
+      # Certificates directory, mounted read-only. Drop a provider CA here
+      # (e.g. certs/supabase-ca.crt) and point DATABASE_CA_CERT_FILE at
+      # /app/certs/<name>.crt. A directory is mounted rather than a single
+      # file because Docker silently creates a stray directory on the host
+      # when a bind-mounted file is missing.
+      - ./certs:/app/certs:ro
     ports:
       - "8082:8082"
     depends_on:

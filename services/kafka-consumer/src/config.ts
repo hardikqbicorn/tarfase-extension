@@ -1,3 +1,5 @@
+import { readCaCertFromEnv } from "@ide-collector/shared-utils";
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -110,7 +112,7 @@ export function loadConfig(): ConsumerServiceConfig {
       : optional("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ide_events"),
     databasePoolSize: optionalInt("DATABASE_POOL_SIZE", 10),
     databaseSslMode: process.env.DATABASE_SSL,
-    databaseCaCert: process.env.DATABASE_CA_CERT,
+    databaseCaCert: readCaCertFromEnv(),
     writeBatchSize: optionalInt("WRITE_BATCH_SIZE", 200),
     emitProcessedEvents: optionalBool("EMIT_PROCESSED_EVENTS", false),
   };

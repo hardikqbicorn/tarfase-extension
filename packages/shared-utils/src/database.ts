@@ -87,6 +87,47 @@ export function resolveDatabaseSsl(input: ResolveSslInput): ResolvedDatabaseSsl 
   return { rejectUnauthorized: true, ...(caCert ? { ca: caCert } : {}) };
 }
 
+/**
+ * A PEM pasted into a .env file cannot contain real newlines, so it arrives
+ * with literal backslash-n sequences. Node's TLS stack needs real ones.
+ */
+export function normalizePem(value: string): string {
+  return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
+}
+
+/**
+ * Reads the CA certificate from the environment.
+ *
+ * `DATABASE_CA_CERT_FILE` (a path) is the ergonomic form - providers hand you
+ * a .crt download, and a multi-line PEM does not belong in a .env file.
+ * `DATABASE_CA_CERT` holds the PEM inline for deployments that inject secrets
+ * as environment variables rather than files.
+ */
+export function readCaCertFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  readFile: (path: string) => string = (path) =>
+    // Required lazily so this module stays importable where fs is unavailable.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    (require("fs") as typeof import("fs")).readFileSync(path, "utf8")
+): string | undefined {
+  const inline = env.DATABASE_CA_CERT;
+  if (inline && inline.trim()) return normalizePem(inline);
+
+  const path = env.DATABASE_CA_CERT_FILE;
+  if (path && path.trim()) {
+    try {
+      return readFile(path.trim());
+    } catch (err) {
+      throw new Error(
+        `Could not read DATABASE_CA_CERT_FILE at "${path}": ` +
+          (err instanceof Error ? err.message : String(err))
+      );
+    }
+  }
+
+  return undefined;
+}
+
 /** Redacts the password so a connection string is safe to log. */
 export function redactDatabaseUrl(databaseUrl: string): string {
   try {
