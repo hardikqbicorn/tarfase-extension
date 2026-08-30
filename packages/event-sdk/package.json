@@ -5,17 +5,17 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
-    "@ide-collector/event-schema": "*",
     "@ide-collector/crypto": "*",
+    "@ide-collector/event-schema": "*",
     "@ide-collector/shared-utils": "*"
   },
   "devDependencies": {
+    "@types/node": "^20.14.15",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5",
-    "@types/node": "^20.14.15"
+    "vitest": "^2.0.5"
   }
 }

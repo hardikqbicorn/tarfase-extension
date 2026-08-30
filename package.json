@@ -9,7 +9,7 @@
     "extensions/vscode"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/integration",
@@ -21,7 +21,9 @@
     "docker:down": "docker compose down -v",
     "test:db": "./scripts/test-db.sh",
     "migrate": "tsx scripts/migrate.ts",
-    "check:db": "tsx scripts/check-db.ts"
+    "check:db": "tsx scripts/check-db.ts",
+    "clean": "tsc -b --clean",
+    "rebuild": "npm run clean && npm run build"
   },
   "devDependencies": {
     "@types/node": "^20.14.15",

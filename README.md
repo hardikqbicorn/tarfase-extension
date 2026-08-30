@@ -51,12 +51,17 @@ Default topology: **Kafka in Docker, events persisted to Supabase.**
 git clone <repo> && cd universal-ide-event-collector
 npm install
 
+npm run build             # required: the extension imports the built packages
+
 cp .env.example .env      # set DATABASE_URL to your Supabase Session pooler string
 npm run migrate           # apply the schema to Supabase
 npm run check:db          # verify connectivity, schema, and the write path
 
 docker compose up --build
 ```
+
+Step-by-step walkthrough, including running the VS Code extension:
+[`docs/running-locally.md`](docs/running-locally.md).
 
 > **Use Supabase's Session pooler, not the direct connection.**
 > `db.<ref>.supabase.co` is IPv6-only unless you have the IPv4 add-on, and
@@ -91,7 +96,7 @@ docker compose --profile local-db up --build   # with DATABASE_URL unset
 ### Running the VS Code extension
 
 ```bash
-npm run build -w extensions/vscode
+npm run build     # if you have not already
 code --extensionDevelopmentPath="$(pwd)/extensions/vscode"
 ```
 
@@ -309,6 +314,7 @@ matching semantics, so `npm test` works anywhere.
 
 | Document | Contents |
 | --- | --- |
+| [`docs/running-locally.md`](docs/running-locally.md) | Step-by-step local run: build, configure, migrate, Docker, extension |
 | [`docs/supabase-setup.md`](docs/supabase-setup.md) | Supabase connection, migrations, the IPv6 gotcha, troubleshooting |
 | [`docs/architecture.md`](docs/architecture.md) | Data flow, component responsibilities, reliability, scaling |
 | [`docs/event-schema.md`](docs/event-schema.md) | Envelope, versioning rules, full event catalog, DB mapping |
@@ -326,6 +332,7 @@ matching semantics, so `npm test` works anywhere.
 | `npm run migrate -- --dry-run` | Shows what would be applied, changes nothing |
 | `npm run check:db` | Diagnoses DNS, TLS, schema, and the write path |
 | `npm run test:db` | Runs the integration suite against a throwaway local PostgreSQL |
+| `npm run rebuild` | Clears the incremental build cache and rebuilds |
 
 Migrations are tracked in `schema_migrations`, so re-running is safe. The
 runner refuses to proceed if an already-applied migration has been edited,

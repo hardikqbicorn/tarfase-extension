@@ -9,8 +9,12 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -90,7 +94,9 @@
         },
         "telemetry.disabledEventTypes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Event types to never collect, e.g. [\"editor.cursor_moved\"]."
         },
@@ -151,7 +157,12 @@
         },
         "telemetry.logLevel": {
           "type": "string",
-          "enum": ["debug", "info", "warn", "error"],
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
           "default": "info",
           "description": "Verbosity of the extension's output channel."
         }
@@ -159,19 +170,19 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "watch": "tsc -p tsconfig.json --watch",
+    "build": "tsc -b",
+    "watch": "tsc -b --watch",
     "test": "vitest run"
   },
   "dependencies": {
+    "@ide-collector/crypto": "*",
     "@ide-collector/event-schema": "*",
     "@ide-collector/event-sdk": "*",
-    "@ide-collector/crypto": "*",
     "@ide-collector/shared-utils": "*"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.14.15",
+    "@types/vscode": "^1.85.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
   }

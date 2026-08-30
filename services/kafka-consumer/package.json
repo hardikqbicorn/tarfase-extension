@@ -5,24 +5,24 @@
   "description": "Consumes ide.events.raw, validates/enriches/redacts, and idempotently persists events into Supabase Postgres.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -b",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run"
   },
   "dependencies": {
-    "@ide-collector/event-schema": "*",
     "@ide-collector/crypto": "*",
+    "@ide-collector/event-schema": "*",
     "@ide-collector/shared-utils": "*",
     "fastify": "^4.28.1",
     "kafkajs": "^2.2.4",
     "pg": "^8.12.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "tsx": "^4.17.0",
-    "vitest": "^2.0.5",
     "@types/node": "^20.14.15",
-    "@types/pg": "^8.11.6"
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.17.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
   }
 }
