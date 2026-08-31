@@ -1,13 +1,32 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/event-schema" },
-    { "path": "packages/crypto" },
-    { "path": "packages/shared-utils" },
-    { "path": "packages/event-sdk" },
-    { "path": "services/kafka-producer" },
-    { "path": "services/kafka-consumer" },
-    { "path": "services/api" },
-    { "path": "extensions/vscode" }
+    {
+      "path": "packages/event-schema"
+    },
+    {
+      "path": "packages/crypto"
+    },
+    {
+      "path": "packages/shared-utils"
+    },
+    {
+      "path": "packages/event-sdk"
+    },
+    {
+      "path": "services/kafka-producer"
+    },
+    {
+      "path": "services/kafka-consumer"
+    },
+    {
+      "path": "services/api"
+    },
+    {
+      "path": "extensions/vscode"
+    },
+    {
+      "path": "cli"
+    }
   ]
 }

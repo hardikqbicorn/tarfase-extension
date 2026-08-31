@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeDatabaseError,
   parseDatabaseHost,
   parseSslMode,
   readCaCertFromEnv,
@@ -155,5 +156,56 @@ describe("redactDatabaseUrl", () => {
     expect(redactDatabaseUrl("postgres://bad url with spaces")).toBe(
       "[unparseable connection string]"
     );
+  });
+});
+
+describe("describeDatabaseError", () => {
+  function withCode(message: string, code?: string): Error {
+    const err = new Error(message);
+    if (code) (err as NodeJS.ErrnoException).code = code;
+    return err;
+  }
+
+  it("names the IPv6/pooler remedy for the real Supabase-in-Docker failure", () => {
+    const described = describeDatabaseError(
+      withCode(
+        "connect ENETUNREACH 2406:da1c:61c:d600:49ba:908b:bc94:3507:5432 - Local (:::0)",
+        "ENETUNREACH"
+      )
+    );
+    expect(described?.remedy).toContain("Session pooler");
+    expect(described?.remedy).toContain("IPv6");
+    // The summary is client-facing, so it must not carry the address.
+    expect(described?.summary).not.toContain("2406");
+  });
+
+  it("does not claim IPv6 for an IPv4 unreachable error", () => {
+    const described = describeDatabaseError(
+      withCode("connect ENETUNREACH 10.0.0.5:5432", "ENETUNREACH")
+    );
+    expect(described?.remedy).not.toContain("IPv6");
+  });
+
+  it("recognises TLS verification failures", () => {
+    const described = describeDatabaseError(
+      new Error("self-signed certificate in certificate chain")
+    );
+    expect(described?.remedy).toContain("DATABASE_CA_CERT_FILE");
+  });
+
+  it("recognises authentication failures and names the pooler user format", () => {
+    const described = describeDatabaseError(new Error("password authentication failed for user"));
+    expect(described?.remedy).toContain("postgres.<project-ref>");
+  });
+
+  it("recognises refused connections and unresolvable hosts", () => {
+    expect(describeDatabaseError(withCode("connect ECONNREFUSED", "ECONNREFUSED"))?.remedy)
+      .toContain("6543");
+    expect(describeDatabaseError(withCode("getaddrinfo ENOTFOUND db.x", "ENOTFOUND"))?.remedy)
+      .toContain("does not resolve");
+  });
+
+  it("returns undefined for an unrelated error, so it is not mislabelled", () => {
+    expect(describeDatabaseError(new Error("something else entirely"))).toBeUndefined();
   });
 });

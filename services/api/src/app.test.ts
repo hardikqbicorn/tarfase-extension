@@ -265,6 +265,68 @@ describe("revocation", () => {
   });
 });
 
+describe("database outage handling", () => {
+  /** Reproduces the real failure: an IPv6-only Supabase host from a container. */
+  function unreachableError(): Error {
+    const err = new Error(
+      "connect ENETUNREACH 2406:da1c:61c:d600:49ba:908b:bc94:3507:5432 - Local (:::0)"
+    );
+    (err as NodeJS.ErrnoException).code = "ENETUNREACH";
+    return err;
+  }
+
+  it("returns 503, not 500, when the database is unreachable", async () => {
+    const { app, repository } = build({ allowOpenEnrollment: true });
+    repository.findOrCreateUser = async () => {
+      throw unreachableError();
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/installations/register",
+      payload: { ide_name: "vscode" },
+    });
+
+    // 503 tells the extension this is transient and worth retrying; the old
+    // behavior was a 500, which reads as "your request is broken".
+    expect(response.statusCode).toBe(503);
+  });
+
+  it("never leaks the database address to the client", async () => {
+    const { app, repository } = build({ allowOpenEnrollment: true });
+    repository.findOrCreateUser = async () => {
+      throw unreachableError();
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/installations/register",
+      payload: { ide_name: "vscode" },
+    });
+
+    // An IDE extension has no business seeing the database host or IP.
+    expect(response.body).not.toContain("2406:da1c");
+    expect(response.body).not.toContain("ENETUNREACH");
+    expect(response.json().error).toContain("cannot reach the database");
+  });
+
+  it("does not leak internals for a non-database failure either", async () => {
+    const { app, repository } = build({ allowOpenEnrollment: true });
+    repository.findOrCreateUser = async () => {
+      throw new Error("secret internal detail");
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/installations/register",
+      payload: { ide_name: "vscode" },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain("secret internal detail");
+  });
+});
+
 describe("operational endpoints", () => {
   it("is healthy even when the database is down", async () => {
     const { app, repository } = build();

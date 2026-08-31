@@ -36,7 +36,7 @@ export default defineConfig({
       "packages/**/*.test.ts",
       "services/**/*.test.ts",
       "extensions/vscode/src/**/*.test.ts",
-      "scripts/**/*.test.ts",
+      "cli/src/**/*.test.ts",
       "tests/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**"],
