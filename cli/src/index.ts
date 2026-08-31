@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "./args";
+import { setupCommand } from "./commands/setup";
 import { installCommand } from "./commands/install";
 import { loginCommand } from "./commands/login";
 import { doctorCommand } from "./commands/doctor";
@@ -15,20 +16,31 @@ const HELP = `${bold("ide-collector")} - install and configure the IDE Event Col
 ${bold("USAGE")}
   ide-collector <command> [options]
 
+${bold("GET STARTED")}
+  npx @ide-collector/cli setup --code <enrollment-code> \\
+      --registration-endpoint https://api.example.com \\
+      --endpoint https://ingest.example.com
+
+  One command: finds your IDE, installs the extension, asks what you consent
+  to, writes the endpoints, registers, and starts collecting. Everything below
+  is the same work split into pieces, for when you need them separately.
+
 ${bold("COMMANDS")}
+  setup         Do all of the below in one go (start here)
   install       Install the extension into your VS Code-family IDE
   login         Register this installation and hand the credential to the extension
   config        Read or write the extension's telemetry.* settings
   doctor        Diagnose why collection is not working
   uninstall     Remove the extension and clear local state
 
-${bold("QUICK START")}
-  npx @ide-collector/cli install
-  npx @ide-collector/cli config set telemetry.enabled true
-  npx @ide-collector/cli login --code <enrollment-code> \\
-      --registration-endpoint https://api.example.com \\
-      --ingestion-endpoint https://ingest.example.com
-  # restart your IDE
+${bold("SETUP OPTIONS")}
+  --code <enrollment-code>         Code issued by your platform administrator
+  --endpoint <url>                 Ingestion API (default: http://localhost:8080)
+  --registration-endpoint <url>    Control plane (default: http://localhost:8081)
+  --ide <vscode|cursor|windsurf>   Target one IDE (default: every detected IDE)
+  --vsix <path>                    Install a local .vsix instead of downloading
+  --yes                            Accept the collection notice without a prompt
+                                   (required when there is no terminal to ask)
 
 ${bold("INSTALL OPTIONS")}
   --ide <vscode|cursor|windsurf>   Target one IDE (default: every detected IDE)
@@ -43,13 +55,15 @@ ${bold("LOGIN OPTIONS")}
   --code <enrollment-code>         Code issued by your platform administrator
   --registration-endpoint <url>    Control plane (default: http://localhost:8081)
   --ingestion-endpoint <url>       Ingestion API (default: http://localhost:8080)
+  --endpoint <url>                 Alias for --ingestion-endpoint
 
 ${bold("GLOBAL")}
   -h, --help       Show this help
   -v, --version    Show the CLI version
 
-${dim("Collection is opt-in and off by default. Nothing is captured until you")}
-${dim("enable it and register.")}
+${dim("Collection is opt-in. Nothing is captured until you agree to the notice")}
+${dim("`setup` prints, and `ide-collector config set telemetry.enabled false`")}
+${dim("stops it again.")}
 `;
 
 async function main(): Promise<number> {
@@ -68,6 +82,9 @@ async function main(): Promise<number> {
   }
 
   switch (args.command) {
+    case "setup":
+    case "init":
+      return setupCommand(args);
     case "install":
       return installCommand(args);
     case "login":

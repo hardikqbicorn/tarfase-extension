@@ -20,6 +20,7 @@ import { VSCodeContextProvider } from "./context-provider";
 import { GitIntegration } from "./git-integration";
 import { VSCodeAdapter } from "./adapter";
 import { VSCodeSecretStore } from "./secret-store";
+import { startCredentialWatch } from "./credential-watch";
 import { AiEventReporter } from "./collectors/ai";
 
 /**
@@ -30,6 +31,10 @@ import { AiEventReporter } from "./collectors/ai";
 const IDE_NAME = process.env.IDE_COLLECTOR_IDE_NAME ?? detectIdeName();
 
 const QUEUE_ENCRYPTION_KEY = "ide-collector.queueKey";
+
+/** Where `ide-collector login` stages a credential. See importStagedCredential. */
+const CREDENTIAL_DIR = join(homedir(), ".ide-collector");
+const CREDENTIAL_FILE = "pending-credential.json";
 
 let collector: EventCollector | undefined;
 let adapter: VSCodeAdapter | undefined;
@@ -80,15 +85,21 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Restart the pipeline when relevant settings change.
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async (event) => {
+    vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("telemetry")) {
-        await stopCollector();
-        await startCollector(context, registrationClient, logger);
+        void queueLifecycle(async () => {
+          await stopCollector();
+          await startCollector(context, registrationClient, logger);
+        });
       }
     })
   );
 
-  await startCollector(context, registrationClient, logger);
+  await queueLifecycle(() => startCollector(context, registrationClient, logger));
+
+  // Registered after the first start so the two cannot both import the same
+  // staged credential on activation.
+  context.subscriptions.push(watchForStagedCredential(context, registrationClient, logger));
 
   // Public API other extensions use to contribute AI events.
   return {
@@ -103,7 +114,60 @@ export async function deactivate() {
   collector?.capture({ eventType: EVENT_TYPES.SESSION_ENDED, payload: {} });
   collector?.capture({ eventType: EVENT_TYPES.EXTENSION_DEACTIVATED, payload: {} });
   await collector?.flush().catch(() => undefined);
-  await stopCollector();
+  // Through the queue, so a restart still in flight finishes before the
+  // collector is torn down rather than racing it.
+  await queueLifecycle(() => stopCollector());
+}
+
+/**
+ * Serialises start/stop of the pipeline.
+ *
+ * Three things restart the collector - activation, a settings change, and a
+ * credential arriving from the CLI - and `ide-collector setup` fires the last
+ * two within a second of each other. Without a queue, two restarts can
+ * interleave and leave a disposed collector installed as the live one.
+ */
+let lifecycle: Promise<unknown> = Promise.resolve();
+
+function queueLifecycle(task: () => Promise<void>): Promise<void> {
+  const next = lifecycle.catch(() => undefined).then(task);
+  lifecycle = next.catch(() => undefined);
+  return next;
+}
+
+/**
+ * Bridges the credential watch to VS Code.
+ *
+ * Window focus is the second trigger: fs.watch does not fire on every
+ * filesystem, and running the CLI in a terminal then switching back to the IDE
+ * is exactly the sequence that stages a credential.
+ */
+function watchForStagedCredential(
+  context: vscode.ExtensionContext,
+  registrationClient: RegistrationClient,
+  logger: Logger
+): vscode.Disposable {
+  const watcher = startCredentialWatch({
+    dir: CREDENTIAL_DIR,
+    filename: CREDENTIAL_FILE,
+    onCandidate: () => importStagedCredential(registrationClient, logger),
+    onImported: () =>
+      queueLifecycle(async () => {
+        await stopCollector();
+        await startCollector(context, registrationClient, logger);
+      }),
+    onError: (error) =>
+      logger.debug("credential watch", { error: error.message }),
+  });
+
+  const onFocus = vscode.window.onDidChangeWindowState((state) => {
+    if (state.focused) void watcher.check();
+  });
+
+  return new vscode.Disposable(() => {
+    watcher.close();
+    onFocus.dispose();
+  });
 }
 
 async function startCollector(
@@ -121,6 +185,7 @@ async function startCollector(
 
   // The CLI cannot write to SecretStorage, so `ide-collector login` stages the
   // credential in a file. Import it here, into the keychain, and delete it.
+  // watchForStagedCredential covers one that arrives after this point.
   await importStagedCredential(registrationClient, logger);
 
   const credentials = await registrationClient.getStoredCredentials();
@@ -214,14 +279,14 @@ async function startCollector(
 async function importStagedCredential(
   registrationClient: RegistrationClient,
   logger: Logger
-): Promise<void> {
-  const path = join(homedir(), ".ide-collector", "pending-credential.json");
+): Promise<boolean> {
+  const path = join(CREDENTIAL_DIR, CREDENTIAL_FILE);
 
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
   } catch {
-    return; // Nothing staged, which is the normal case.
+    return false; // Nothing staged, which is the normal case.
   }
 
   const discard = async (reason: string) => {
@@ -243,7 +308,7 @@ async function importStagedCredential(
     payload = JSON.parse(raw);
   } catch {
     await discard("was unreadable");
-    return;
+    return false;
   }
 
   if (
@@ -253,13 +318,13 @@ async function importStagedCredential(
     !payload.user_id
   ) {
     await discard("was malformed");
-    return;
+    return false;
   }
 
   const expiresAt = Date.parse(payload.expires_at ?? "");
   if (Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
     await discard("expired before it was imported");
-    return;
+    return false;
   }
 
   await registrationClient.storeCredentials({
@@ -278,6 +343,8 @@ async function importStagedCredential(
   vscode.window.showInformationMessage(
     "IDE Event Collector: credential imported and stored in your OS keychain."
   );
+
+  return true;
 }
 
 async function stopCollector(): Promise<void> {

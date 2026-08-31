@@ -82,8 +82,9 @@ export async function doctorCommand(args: ParsedArgs): Promise<number> {
     case "ok":
       warn(
         "A staged credential is waiting to be imported.",
-        "Restart your IDE (or run 'Developer: Reload Window'). The extension moves it\n" +
-          "into the OS keychain and deletes the staged file."
+        "Open the IDE, or focus its window if it is already open. The extension moves\n" +
+          "the credential into the OS keychain and deletes the staged file within a few\n" +
+          "seconds. If it does not, reload the window ('Developer: Reload Window')."
       );
       break;
     case "expired":

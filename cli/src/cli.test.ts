@@ -7,7 +7,10 @@ import { selectIdes, userSettingsDir, type IdeTarget } from "./ide";
 import { applyCollectorSettings, readSettings, stripJsonComments, writeSettings } from "./settings";
 import { clearHandoff, readHandoff, writeHandoff } from "./handoff";
 import { coerceSettingValue } from "./commands/config";
-import { selectVsixAsset, findLocalVsix } from "./vsix";
+import { selectVsixAsset, findLocalVsix, resolveVsix } from "./vsix";
+import { machineFingerprint, registerInstallation } from "./register";
+import { isInteractive } from "./prompt";
+import { hostname, userInfo } from "os";
 
 describe("parseArgs", () => {
   it("separates command, positionals, and options", () => {
@@ -271,5 +274,170 @@ describe("vsix resolution", () => {
     await writeFile(join(dir, "ide-event-collector-0.2.0.vsix"), "x");
     expect(await findLocalVsix(dir)).toContain("0.2.0");
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("registerInstallation", () => {
+  const endpoint = "http://control.test";
+
+  const jsonResponse = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+
+  it("returns the payload on success", async () => {
+    const outcome = await registerInstallation({
+      registrationEndpoint: endpoint,
+      code: "abc",
+      fetchImpl: async () =>
+        jsonResponse(200, {
+          installation_id: "i-1",
+          installation_token: "t-1",
+          user_id: "u-1",
+        }),
+    });
+
+    expect(outcome).toEqual({
+      ok: true,
+      payload: { installation_id: "i-1", installation_token: "t-1", user_id: "u-1" },
+    });
+  });
+
+  it("sends the enrollment code only when one was given", async () => {
+    const bodies: unknown[] = [];
+    const capture = async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return jsonResponse(200, {
+        installation_id: "i",
+        installation_token: "t",
+        user_id: "u",
+      });
+    };
+
+    await registerInstallation({
+      registrationEndpoint: endpoint,
+      code: "code-1",
+      fetchImpl: capture as unknown as typeof fetch,
+    });
+    await registerInstallation({
+      registrationEndpoint: endpoint,
+      fetchImpl: capture as unknown as typeof fetch,
+    });
+
+    expect((bodies[0] as Record<string, unknown>).enrollment_code).toBe("code-1");
+    expect(bodies[1]).not.toHaveProperty("enrollment_code");
+  });
+
+  it("does not put the hostname or username on the wire", async () => {
+    let sent: Record<string, unknown> = {};
+    await registerInstallation({
+      registrationEndpoint: endpoint,
+      fetchImpl: (async (_url: string, init?: RequestInit) => {
+        sent = JSON.parse(String(init?.body));
+        return jsonResponse(200, {
+          installation_id: "i",
+          installation_token: "t",
+          user_id: "u",
+        });
+      }) as unknown as typeof fetch,
+    });
+
+    const serialised = JSON.stringify(sent);
+    expect(serialised).not.toContain(hostname());
+    expect(serialised).not.toContain(userInfo().username);
+    expect(sent.machine_id).toBe(machineFingerprint());
+  });
+
+  it("distinguishes a bad code from an unreachable database", async () => {
+    const rejected = await registerInstallation({
+      registrationEndpoint: endpoint,
+      code: "stale",
+      fetchImpl: async () => new Response("nope", { status: 401 }),
+    });
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) expect(rejected.detail).toMatch(/single-use/);
+
+    const unavailable = await registerInstallation({
+      registrationEndpoint: endpoint,
+      fetchImpl: async () => new Response("", { status: 503 }),
+    });
+    expect(unavailable.ok).toBe(false);
+    if (!unavailable.ok) expect(unavailable.message).toMatch(/cannot reach its database/);
+  });
+
+  it("reports an unreachable control plane rather than throwing", async () => {
+    const outcome = await registerInstallation({
+      registrationEndpoint: endpoint,
+      fetchImpl: async () => {
+        throw new Error("ECONNREFUSED");
+      },
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.message).toContain(endpoint);
+      expect(outcome.detail).toContain("curl");
+    }
+  });
+
+  it("rejects a 200 that is missing the token", async () => {
+    // A partial success stored as a credential would fail later, at ingestion,
+    // where the cause is much harder to see.
+    const outcome = await registerInstallation({
+      registrationEndpoint: endpoint,
+      fetchImpl: async () => jsonResponse(200, { installation_id: "i", user_id: "u" }),
+    });
+    expect(outcome.ok).toBe(false);
+  });
+});
+
+describe("resolveVsix", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "vsix-resolve-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("prefers an explicit --vsix over anything else", async () => {
+    const explicit = join(dir, "given.vsix");
+    await writeFile(explicit, "x");
+
+    const resolved = await resolveVsix({ explicit, cwd: dir });
+    expect(resolved.origin).toBe("explicit");
+    expect(resolved.path).toBe(explicit);
+  });
+
+  it("fails on an explicit path that does not exist", async () => {
+    await expect(resolveVsix({ explicit: join(dir, "absent.vsix") })).rejects.toThrow(
+      /No file at/
+    );
+  });
+
+  it("falls back to a local build when run from a checkout", async () => {
+    const extensionDir = join(dir, "extensions", "vscode");
+    await mkdir(extensionDir, { recursive: true });
+    await writeFile(join(extensionDir, "ide-event-collector-0.1.0.vsix"), "x");
+
+    const resolved = await resolveVsix({ cwd: dir });
+    expect(resolved.origin).toBe("local-build");
+    expect(resolved.path).toBe(join(extensionDir, "ide-event-collector-0.1.0.vsix"));
+  });
+});
+
+describe("isInteractive", () => {
+  // The consent prompt is only meaningful if something can answer it. Without
+  // a TTY, `setup` has to stop rather than assume yes.
+  const tty = { isTTY: true } as NodeJS.ReadStream;
+  const pipe = { isTTY: undefined } as unknown as NodeJS.ReadStream;
+
+  it("is true only when both streams are terminals", () => {
+    expect(isInteractive(tty, tty as unknown as NodeJS.WriteStream)).toBe(true);
+    expect(isInteractive(pipe, tty as unknown as NodeJS.WriteStream)).toBe(false);
+    expect(isInteractive(tty, pipe as unknown as NodeJS.WriteStream)).toBe(false);
   });
 });

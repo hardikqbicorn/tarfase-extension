@@ -45,22 +45,69 @@ Docker daemon available).
 
 ## Quick start
 
+There are two audiences here, and each has one command.
+
+### If you just want to use it
+
+Someone is already running the backend and has given you its addresses:
+
+```bash
+npx @ide-collector/cli setup \
+  --registration-endpoint https://api.example.com \
+  --endpoint https://ingest.example.com
+```
+
+That finds your IDE, installs the extension, shows you exactly what is and is
+not collected, waits for you to agree, writes the endpoints, registers the
+installation, and stages the credential. Open your IDE and it starts
+collecting — no restart, no settings to tick, no palette commands.
+
+If your platform requires an enrollment code, add `--code <code>`.
+
+Nothing is collected until you answer that prompt, and one command stops it:
+
+```bash
+npx @ide-collector/cli config set telemetry.enabled false
+```
+
+The CLI is documented in [`cli/README.md`](cli/README.md).
+
+> `@ide-collector/cli` is not published to npm yet, and there is no tagged
+> release for it to download the `.vsix` from. Until both exist, run it from a
+> checkout — `npm install` links it, so `npx ide-collector setup` works and
+> picks up a locally built package. Publishing is
+> `npm publish -w cli --access public`; the release is `git tag v0.1.0 &&
+> git push origin v0.1.0`, which builds and attaches the `.vsix`.
+
+### If you are running the backend
+
 Default topology: **Kafka in Docker, events persisted to Supabase.**
 
 ```bash
 git clone <repo> && cd universal-ide-event-collector
 npm install
+npm run quickstart
+```
 
+`quickstart` builds the workspace, starts Kafka and the three services, applies
+the schema, waits until the pipeline reports ready, and prints the CLI command
+to run next (`npx ide-collector setup` — `npm install` links the CLI from this
+checkout). With no `.env` it generates one — with real random secrets — and
+uses the bundled PostgreSQL, so a fresh clone works without a Supabase account.
+Set `DATABASE_URL` to your Supabase Session pooler string in `.env` to use
+Supabase instead.
+
+The same thing by hand, when you want to see each step:
+
+```bash
 npm run build             # required: the extension imports the built packages
-
 cp .env.example .env      # set DATABASE_URL to your Supabase Session pooler string
-npm run migrate           # apply the schema to Supabase
+npm run migrate           # apply the schema
 npm run check:db          # verify connectivity, schema, and the write path
-
 docker compose up --build
 ```
 
-Step-by-step walkthrough, including running the VS Code extension:
+Step-by-step walkthrough:
 [`docs/running-locally.md`](docs/running-locally.md).
 
 > **Use Supabase's Session pooler, not the direct connection.**
@@ -69,8 +116,6 @@ Step-by-step walkthrough, including running the VS Code extension:
 > fails from a container. `npm run check:db` detects this and names the fix.
 > Details in [`docs/supabase-setup.md`](docs/supabase-setup.md).
 
-That brings up Kafka (KRaft), Kafka UI, and the three services:
-
 | Service | URL |
 | --- | --- |
 | Ingestion API | http://localhost:8080 |
@@ -78,38 +123,33 @@ That brings up Kafka (KRaft), Kafka UI, and the three services:
 | Consumer (metrics) | http://localhost:8082 |
 | Kafka UI | http://localhost:8090 |
 
-Verify:
-
 ```bash
 curl localhost:8080/health && curl localhost:8081/health && curl localhost:8082/ready
 ```
 
 ### Prefer a fully local stack?
 
-Local PostgreSQL is still available behind a Compose profile — it does not
-start by default:
+`quickstart` uses it automatically when no `DATABASE_URL` is set. By hand, it
+is behind a Compose profile so it does not start by default:
 
 ```bash
 docker compose --profile local-db up --build   # with DATABASE_URL unset
 ```
 
-### Running the VS Code extension
+### Running the extension from source
+
+For working on the extension itself, rather than installing a package:
 
 ```bash
 npm run build     # if you have not already
 code --extensionDevelopmentPath="$(pwd)/extensions/vscode"
 ```
 
-In the launched window:
-
-1. **Settings → `telemetry.enabled`** → on. *(Collection is opt-in and off by
-   default.)*
-2. **Command Palette → "IDE Collector: Register This Installation"**. In
-   development, leave the enrollment code blank — `ALLOW_OPEN_ENROLLMENT=true`
-   lets the extension self-enroll.
-3. Edit and save a file.
-4. **Command Palette → "IDE Collector: Show Status"** to see queue and delivery
-   counts.
+In the launched window, either run `npx ide-collector login` in a terminal
+and let the extension pick the credential up, or use **Command Palette → "IDE
+Collector: Register This Installation"** directly. Turn collection on with
+**Settings → `telemetry.enabled`**; it is opt-in and off by default.
+**"IDE Collector: Show Status"** shows queue and delivery counts.
 
 ### Seeing the events land
 
