@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { readFile, rm } from "fs/promises";
+import { homedir } from "os";
 import { join } from "path";
 import * as vscode from "vscode";
 import { EVENT_TYPES } from "@ide-collector/event-schema";
@@ -117,6 +119,10 @@ async function startCollector(
     return;
   }
 
+  // The CLI cannot write to SecretStorage, so `ide-collector login` stages the
+  // credential in a file. Import it here, into the keychain, and delete it.
+  await importStagedCredential(registrationClient, logger);
+
   const credentials = await registrationClient.getStoredCredentials();
   if (!credentials) {
     logger.warn("no installation credentials; run 'IDE Collector: Register This Installation'");
@@ -191,6 +197,87 @@ async function startCollector(
 
   logger.info("collector active", { ide: IDE_NAME, capabilities: adapter.capabilities });
   startStatusBar(context);
+}
+
+/**
+ * Imports a credential staged by `ide-collector login`.
+ *
+ * The CLI cannot reach VS Code's SecretStorage, so it leaves the credential in
+ * a 0600 file. This moves it into the OS keychain and deletes the file, so the
+ * plaintext token exists on disk for as long as it takes the user to restart
+ * the IDE rather than indefinitely.
+ *
+ * An expired or malformed file is deleted rather than imported: a credential
+ * that sat around long enough to expire is one we should make the user
+ * re-issue, not quietly accept.
+ */
+async function importStagedCredential(
+  registrationClient: RegistrationClient,
+  logger: Logger
+): Promise<void> {
+  const path = join(homedir(), ".ide-collector", "pending-credential.json");
+
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch {
+    return; // Nothing staged, which is the normal case.
+  }
+
+  const discard = async (reason: string) => {
+    await rm(path, { force: true }).catch(() => undefined);
+    logger.warn("discarded staged credential", { reason });
+    vscode.window.showWarningMessage(
+      `IDE Event Collector: staged credential ${reason}. Run \`ide-collector login\` again.`
+    );
+  };
+
+  let payload: {
+    version?: number;
+    installation_id?: string;
+    installation_token?: string;
+    user_id?: string;
+    expires_at?: string;
+  };
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    await discard("was unreadable");
+    return;
+  }
+
+  if (
+    payload.version !== 1 ||
+    !payload.installation_id ||
+    !payload.installation_token ||
+    !payload.user_id
+  ) {
+    await discard("was malformed");
+    return;
+  }
+
+  const expiresAt = Date.parse(payload.expires_at ?? "");
+  if (Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
+    await discard("expired before it was imported");
+    return;
+  }
+
+  await registrationClient.storeCredentials({
+    installationId: payload.installation_id,
+    installationToken: payload.installation_token,
+    userId: payload.user_id,
+  });
+
+  // Only remove the file once the keychain write succeeded, so a failure there
+  // does not lose the credential entirely.
+  await rm(path, { force: true }).catch(() => undefined);
+
+  logger.info("imported staged credential from the CLI", {
+    installationId: payload.installation_id,
+  });
+  vscode.window.showInformationMessage(
+    "IDE Event Collector: credential imported and stored in your OS keychain."
+  );
 }
 
 async function stopCollector(): Promise<void> {

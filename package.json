@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "services/*",
-    "extensions/vscode"
+    "extensions/vscode",
+    "cli"
   ],
   "scripts": {
     "build": "tsc -b",

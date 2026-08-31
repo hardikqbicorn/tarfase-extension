@@ -1,0 +1,72 @@
+name: Release extension
+
+# Builds the VS Code extension into a .vsix and attaches it to a GitHub
+# release. `ide-collector install` downloads that asset, so without this
+# workflow the CLI can only install a locally built package.
+#
+# Trigger by pushing a tag:  git tag v0.1.0 && git push origin v0.1.0
+# Or run it manually from the Actions tab.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Guard the release: a broken build must not become a downloadable
+      # artifact that `ide-collector install` will happily hand to users.
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Package extension
+        id: package
+        run: |
+          cd extensions/vscode
+          npx --yes @vscode/vsce package --no-dependencies --out ide-event-collector.vsix
+          echo "vsix=extensions/vscode/ide-event-collector.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Checksum
+        run: |
+          cd extensions/vscode
+          sha256sum ide-event-collector.vsix > ide-event-collector.vsix.sha256
+          cat ide-event-collector.vsix.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: |
+            extensions/vscode/ide-event-collector.vsix
+            extensions/vscode/ide-event-collector.vsix.sha256
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            extensions/vscode/ide-event-collector.vsix
+            extensions/vscode/ide-event-collector.vsix.sha256
+          generate_release_notes: true

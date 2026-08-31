@@ -1,0 +1,30 @@
+{
+  "name": "@ide-collector/cli",
+  "version": "0.1.0",
+  "description": "Install and configure the IDE Event Collector extension from the command line.",
+  "license": "MIT",
+  "bin": {
+    "ide-collector": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ide-collector/event-sdk": "*",
+    "@ide-collector/shared-utils": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

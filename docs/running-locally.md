@@ -244,7 +244,7 @@ your host it is `localhost:9092`.
 ## Tests
 
 ```bash
-npm test              # 185 tests, no database or Kafka needed
+npm test              # 218 tests, no database or Kafka needed
 npm run test:db       # integration suite against a throwaway local PostgreSQL
 npm run typecheck     # tsc -b across the monorepo
 ```
