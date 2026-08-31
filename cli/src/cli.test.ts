@@ -7,7 +7,7 @@ import { selectIdes, userSettingsDir, type IdeTarget } from "./ide";
 import { applyCollectorSettings, readSettings, stripJsonComments, writeSettings } from "./settings";
 import { clearHandoff, readHandoff, writeHandoff } from "./handoff";
 import { coerceSettingValue } from "./commands/config";
-import { selectVsixAsset, findLocalVsix, resolveVsix } from "./vsix";
+import { EXTENSION_ID, selectVsixAsset, findLocalVsix, resolveVsix } from "./vsix";
 import { machineFingerprint, registerInstallation } from "./register";
 import { isInteractive } from "./prompt";
 import { hostname, userInfo } from "os";
@@ -439,5 +439,21 @@ describe("isInteractive", () => {
     expect(isInteractive(tty, tty as unknown as NodeJS.WriteStream)).toBe(true);
     expect(isInteractive(pipe, tty as unknown as NodeJS.WriteStream)).toBe(false);
     expect(isInteractive(tty, pipe as unknown as NodeJS.WriteStream)).toBe(false);
+  });
+});
+
+describe("EXTENSION_ID", () => {
+  it("matches publisher.name in the extension's package.json", async () => {
+    // The CLI ships without the repository, so the id has to be a constant.
+    // This is what stops a rename in the extension manifest from silently
+    // breaking `doctor`'s installed check and `uninstall` entirely.
+    const manifest = JSON.parse(
+      await readFile(
+        join(__dirname, "..", "..", "extensions", "vscode", "package.json"),
+        "utf8"
+      )
+    ) as { publisher: string; name: string };
+
+    expect(EXTENSION_ID).toBe(`${manifest.publisher}.${manifest.name}`);
   });
 });

@@ -31,7 +31,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./dist/extension.js",
+  "main": "./bundle/extension.js",
   "contributes": {
     "commands": [
       {
@@ -191,9 +191,12 @@
     }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node esbuild.mjs",
     "watch": "tsc -b --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bundle": "node esbuild.mjs",
+    "package": "npm run build && npm run bundle:production && npx --yes @vscode/vsce package --no-dependencies",
+    "bundle:production": "node esbuild.mjs --production"
   },
   "dependencies": {
     "@ide-collector/crypto": "*",
@@ -204,6 +207,7 @@
   "devDependencies": {
     "@types/node": "^20.14.15",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
   }

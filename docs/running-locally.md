@@ -337,7 +337,8 @@ query tool, not a second persistence layer.
 | --- | --- |
 | `npm run quickstart` | Build, start everything, migrate, wait for ready |
 | `npx ide-collector setup` | Install and register the extension |
-| `npm run build` | Build all packages and services |
+| `npm run build` | Build all packages, services, and the extension bundle |
+| `npm run package -w extensions/vscode` | Build a `.vsix` |
 | `npm run clean` / `npm run rebuild` | Clear the build cache and outputs |
 | `npm run migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run migrate -- --dry-run` | Preview migrations |

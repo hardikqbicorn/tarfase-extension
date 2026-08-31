@@ -15,7 +15,15 @@ import { pipeline } from "stream/promises";
  */
 
 export const DEFAULT_REPO = "hardikqbicorn/tarfase-extension";
-export const EXTENSION_ID = "ide-collector.ide-event-collector";
+/**
+ * `publisher.name` from extensions/vscode/package.json - the id VS Code
+ * reports from `--list-extensions` and accepts for `--uninstall-extension`.
+ *
+ * Duplicated here rather than imported because the CLI ships without the
+ * repository. A test asserts the two stay in step, which is how a rename gets
+ * caught rather than silently breaking `doctor` and `uninstall`.
+ */
+export const EXTENSION_ID = "Tarfase.tarfase";
 
 export interface ReleaseAsset {
   name: string;

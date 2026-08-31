@@ -268,7 +268,7 @@ events, which then flow through the same redaction and delivery path:
 
 ```ts
 const collector = vscode.extensions
-  .getExtension("ide-collector.ide-event-collector")
+  .getExtension("Tarfase.tarfase")
   ?.exports;
 
 collector?.ai.reportPrompt({ provider: "copilot", model: "gpt-5", prompt_tokens: 120 });

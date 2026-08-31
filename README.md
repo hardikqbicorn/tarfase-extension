@@ -141,7 +141,7 @@ docker compose --profile local-db up --build   # with DATABASE_URL unset
 For working on the extension itself, rather than installing a package:
 
 ```bash
-npm run build     # if you have not already
+npm run build     # also produces the extension bundle it runs from
 code --extensionDevelopmentPath="$(pwd)/extensions/vscode"
 ```
 
@@ -279,7 +279,7 @@ Rather than pretend otherwise, the platform does two things:
 
 ```ts
 const collector = vscode.extensions
-  .getExtension("ide-collector.ide-event-collector")?.exports;
+  .getExtension("Tarfase.tarfase")?.exports;
 
 collector?.ai.reportPrompt({ provider: "copilot", model: "gpt-5", prompt_tokens: 120 });
 collector?.ai.codeGenerated({ lines_generated: 24, accepted: true });

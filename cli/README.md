@@ -98,10 +98,14 @@ old enough to expire is one worth re-issuing.
 Until a release exists, contributors can build and install locally:
 
 ```bash
-npm run build -w extensions/vscode
-cd extensions/vscode && npx @vscode/vsce package
-ide-collector install --vsix extensions/vscode/*.vsix
+npm run package -w extensions/vscode   # builds, bundles, writes a .vsix
+npx ide-collector setup                # picks it up from the checkout
 ```
+
+The `package` script bundles before packaging, and that matters: a `.vsix`
+ships no `node_modules`, and the extension imports four workspace packages. An
+unbundled build packages cleanly and then fails on activation — installed,
+listed, and doing nothing.
 
 ## Design notes
 
