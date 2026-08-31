@@ -1,5 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { EVENT_TYPES, IDEEvent, validateEvent } from "@ide-collector/event-schema";
+import {
+  EVENT_TYPES,
+  IDEEvent,
+  validateEvent,
+} from "@ide-collector/event-schema";
 import {
   EventCollector,
   EventQueue,
@@ -20,7 +24,7 @@ import { registerTerminalCollectors } from "./terminal";
 import { registerDebugCollectors } from "./debug";
 import { registerTaskCollectors } from "./tasks";
 import { registerDiagnosticsCollectors } from "./diagnostics";
-import { registerAiCollectors } from "./ai";
+import { AiEventReporter, registerAiCollectors } from "./ai";
 
 const stub = vscode as unknown as typeof import("../../test/vscode-stub");
 
@@ -36,7 +40,9 @@ interface Harness {
   disposables: { dispose(): void }[];
 }
 
-async function makeHarness(configOverrides: Record<string, unknown> = {}): Promise<Harness> {
+async function makeHarness(
+  configOverrides: Record<string, unknown> = {},
+): Promise<Harness> {
   const captured: IDEEvent[] = [];
   const queue = new EventQueue({
     maxQueueSize: 1000,
@@ -53,11 +59,19 @@ async function makeHarness(configOverrides: Record<string, unknown> = {}): Promi
 
   const collector = new EventCollector({
     config,
-    identity: { userId: "user-1", installationId: "install-1", sessionId: "session-1" },
+    identity: {
+      userId: "user-1",
+      installationId: "install-1",
+      sessionId: "session-1",
+    },
     contextProvider,
     queue,
     transport: new CapturingTransport(),
-    logger: new Logger({ service: "test", level: "error", sink: { write: () => {} } }),
+    logger: new Logger({
+      service: "test",
+      level: "error",
+      sink: { write: () => {} },
+    }),
   });
   await collector.start();
 
@@ -69,7 +83,11 @@ async function makeHarness(configOverrides: Record<string, unknown> = {}): Promi
     return event;
   };
 
-  return { deps: { collector, config, contextProvider, git }, captured, disposables: [] };
+  return {
+    deps: { collector, config, contextProvider, git },
+    captured,
+    disposables: [],
+  };
 }
 
 function typesOf(events: IDEEvent[]): string[] {
@@ -122,7 +140,7 @@ describe("file collectors", () => {
 
   it("captures file.opened with a workspace-relative path", () => {
     stub.fire.didOpenTextDocument(
-      stub.makeDocument({ path: "/workspace/my-project/src/index.ts" })
+      stub.makeDocument({ path: "/workspace/my-project/src/index.ts" }),
     );
 
     const event = firstOfType(harness.captured, EVENT_TYPES.FILE_OPENED)!;
@@ -132,7 +150,10 @@ describe("file collectors", () => {
 
   it("never emits an absolute path for a file outside the workspace", () => {
     stub.fire.didOpenTextDocument(
-      stub.makeDocument({ path: "/Users/alice/private/notes.md", languageId: "markdown" })
+      stub.makeDocument({
+        path: "/Users/alice/private/notes.md",
+        languageId: "markdown",
+      }),
     );
 
     const event = firstOfType(harness.captured, EVENT_TYPES.FILE_OPENED)!;
@@ -142,7 +163,10 @@ describe("file collectors", () => {
 
   it("flags sensitive files without collecting their content", () => {
     stub.fire.didOpenTextDocument(
-      stub.makeDocument({ path: "/workspace/my-project/.env", languageId: "dotenv" })
+      stub.makeDocument({
+        path: "/workspace/my-project/.env",
+        languageId: "dotenv",
+      }),
     );
 
     const event = firstOfType(harness.captured, EVENT_TYPES.FILE_OPENED)!;
@@ -156,7 +180,7 @@ describe("file collectors", () => {
         path: "/workspace/my-project/src/app.ts",
         lineCount: 42,
         getText: () => "const secret = 'hunter2';",
-      })
+      }),
     );
 
     const event = firstOfType(harness.captured, EVENT_TYPES.FILE_SAVED)!;
@@ -206,29 +230,47 @@ describe("editor collectors", () => {
 
   it("captures active editor changes", () => {
     stub.fire.didChangeActiveTextEditor({
-      document: stub.makeDocument({ path: "/workspace/my-project/src/index.ts" }),
+      document: stub.makeDocument({
+        path: "/workspace/my-project/src/index.ts",
+      }),
     });
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.EDITOR_ACTIVE_CHANGED)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.EDITOR_ACTIVE_CHANGED,
+    )!;
     expect(event.file?.path).toBe("src/index.ts");
   });
 
   it("classifies an empty selection as a cursor move", () => {
     stub.fire.didChangeTextEditorSelection({
-      textEditor: { document: stub.makeDocument({ path: "/workspace/my-project/a.ts" }) },
-      selections: [new stub.Selection(new stub.Position(3, 0), new stub.Position(3, 0))],
+      textEditor: {
+        document: stub.makeDocument({ path: "/workspace/my-project/a.ts" }),
+      },
+      selections: [
+        new stub.Selection(new stub.Position(3, 0), new stub.Position(3, 0)),
+      ],
     });
 
-    expect(typesOf(harness.captured)).toContain(EVENT_TYPES.EDITOR_CURSOR_MOVED);
+    expect(typesOf(harness.captured)).toContain(
+      EVENT_TYPES.EDITOR_CURSOR_MOVED,
+    );
   });
 
   it("classifies a non-empty selection as a selection change", () => {
     stub.fire.didChangeTextEditorSelection({
-      textEditor: { document: stub.makeDocument({ path: "/workspace/my-project/a.ts" }) },
-      selections: [new stub.Selection(new stub.Position(1, 0), new stub.Position(5, 10))],
+      textEditor: {
+        document: stub.makeDocument({ path: "/workspace/my-project/a.ts" }),
+      },
+      selections: [
+        new stub.Selection(new stub.Position(1, 0), new stub.Position(5, 10)),
+      ],
     });
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.EDITOR_SELECTION_CHANGED)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.EDITOR_SELECTION_CHANGED,
+    )!;
     expect(event.payload.selected_lines).toBe(5);
   });
 
@@ -237,37 +279,50 @@ describe("editor collectors", () => {
     for (let i = 0; i < 10; i++) {
       stub.fire.didChangeTextEditorSelection({
         textEditor: { document },
-        selections: [new stub.Selection(new stub.Position(i, 0), new stub.Position(i, 0))],
+        selections: [
+          new stub.Selection(new stub.Position(i, 0), new stub.Position(i, 0)),
+        ],
       });
     }
 
     const cursorEvents = harness.captured.filter(
-      (e) => e.event_type === EVENT_TYPES.EDITOR_CURSOR_MOVED
+      (e) => e.event_type === EVENT_TYPES.EDITOR_CURSOR_MOVED,
     );
     expect(cursorEvents).toHaveLength(1);
   });
 
   it("throttles per file, not globally", () => {
-    for (const path of ["/workspace/my-project/a.ts", "/workspace/my-project/b.ts"]) {
+    for (const path of [
+      "/workspace/my-project/a.ts",
+      "/workspace/my-project/b.ts",
+    ]) {
       stub.fire.didChangeTextEditorSelection({
         textEditor: { document: stub.makeDocument({ path }) },
-        selections: [new stub.Selection(new stub.Position(0, 0), new stub.Position(0, 0))],
+        selections: [
+          new stub.Selection(new stub.Position(0, 0), new stub.Position(0, 0)),
+        ],
       });
     }
 
     const cursorEvents = harness.captured.filter(
-      (e) => e.event_type === EVENT_TYPES.EDITOR_CURSOR_MOVED
+      (e) => e.event_type === EVENT_TYPES.EDITOR_CURSOR_MOVED,
     );
     expect(cursorEvents).toHaveLength(2);
   });
 
   it("captures document changes as counts, never as text", () => {
     stub.fire.didChangeTextDocument({
-      document: stub.makeDocument({ path: "/workspace/my-project/a.ts", isDirty: true }),
+      document: stub.makeDocument({
+        path: "/workspace/my-project/a.ts",
+        isDirty: true,
+      }),
       contentChanges: [{ text: "const apiKey = 'sk-secret';", rangeLength: 3 }],
     });
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.EDITOR_DOCUMENT_CHANGED)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.EDITOR_DOCUMENT_CHANGED,
+    )!;
     expect(event.payload.chars_added).toBe(27);
     expect(event.payload.chars_removed).toBe(3);
     expect(JSON.stringify(event)).not.toContain("sk-secret");
@@ -279,7 +334,10 @@ describe("editor collectors", () => {
       contentChanges: [{ text: "x".repeat(500), rangeLength: 0 }],
     });
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.EDITOR_DOCUMENT_CHANGED)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.EDITOR_DOCUMENT_CHANGED,
+    )!;
     expect(event.payload.likely_bulk_insert).toBe(true);
   });
 });
@@ -313,11 +371,17 @@ describe("terminal collectors", () => {
       exitCode: 1,
     });
 
-    const started = firstOfType(harness.captured, EVENT_TYPES.TERMINAL_COMMAND_EXECUTED)!;
+    const started = firstOfType(
+      harness.captured,
+      EVENT_TYPES.TERMINAL_COMMAND_EXECUTED,
+    )!;
     expect(started.payload.command).toBe("npm test");
     expect(started.payload.command_name).toBe("npm");
 
-    const completed = firstOfType(harness.captured, EVENT_TYPES.TERMINAL_COMMAND_COMPLETED)!;
+    const completed = firstOfType(
+      harness.captured,
+      EVENT_TYPES.TERMINAL_COMMAND_COMPLETED,
+    )!;
     expect(completed.payload.exit_code).toBe(1);
     expect(completed.payload.succeeded).toBe(false);
   });
@@ -325,11 +389,20 @@ describe("terminal collectors", () => {
   it("redacts secrets in captured commands", () => {
     stub.fire.didStartTerminalShellExecution({
       terminal: { name: "bash" },
-      execution: { commandLine: { value: "OPENAI_API_KEY=sk-verysecretvalue123 npm start" } },
+      execution: {
+        commandLine: {
+          value: "OPENAI_API_KEY=sk-verysecretvalue123 npm start",
+        },
+      },
     });
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.TERMINAL_COMMAND_EXECUTED)!;
-    expect(JSON.stringify(event.payload)).not.toContain("sk-verysecretvalue123");
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.TERMINAL_COMMAND_EXECUTED,
+    )!;
+    expect(JSON.stringify(event.payload)).not.toContain(
+      "sk-verysecretvalue123",
+    );
     // The executable name survives redaction, so aggregates still work.
     expect(event.payload.command_name).toBe("npm");
   });
@@ -349,10 +422,16 @@ describe("debug collectors", () => {
     stub.fire.didStartDebugSession(session);
     stub.fire.didTerminateDebugSession(session);
 
-    const started = firstOfType(harness.captured, EVENT_TYPES.DEBUGGER_STARTED)!;
+    const started = firstOfType(
+      harness.captured,
+      EVENT_TYPES.DEBUGGER_STARTED,
+    )!;
     expect(started.payload.debug_type).toBe("node");
 
-    const stopped = firstOfType(harness.captured, EVENT_TYPES.DEBUGGER_STOPPED)!;
+    const stopped = firstOfType(
+      harness.captured,
+      EVENT_TYPES.DEBUGGER_STOPPED,
+    )!;
     expect(stopped.payload.duration_ms).toBeTypeOf("number");
   });
 
@@ -384,7 +463,9 @@ describe("task collectors", () => {
   });
 
   it("classifies a test task and reports failure", () => {
-    const execution = { task: { name: "npm: test", source: "npm", group: { id: "test" } } };
+    const execution = {
+      task: { name: "npm: test", source: "npm", group: { id: "test" } },
+    };
     stub.fire.didStartTaskProcess({ execution, processId: 123 });
     stub.fire.didEndTaskProcess({ execution, exitCode: 1 });
 
@@ -394,7 +475,9 @@ describe("task collectors", () => {
   });
 
   it("classifies a build task and reports success", () => {
-    const execution = { task: { name: "npm: build", source: "npm", group: { id: "build" } } };
+    const execution = {
+      task: { name: "npm: build", source: "npm", group: { id: "build" } },
+    };
     stub.fire.didStartTaskProcess({ execution });
     stub.fire.didEndTaskProcess({ execution, exitCode: 0 });
 
@@ -425,7 +508,10 @@ describe("diagnostics collectors", () => {
 
     stub.fire.didChangeDiagnostics([uri]);
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.DIAGNOSTICS_REPORTED)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.DIAGNOSTICS_REPORTED,
+    )!;
     expect(event.payload.error_count).toBe(1);
     expect(event.payload.warning_count).toBe(1);
     expect(event.payload.sources).toEqual(["ts", "eslint"]);
@@ -440,9 +526,58 @@ describe("ai collectors", () => {
     const harness = await makeHarness();
     registerAiCollectors(harness.deps);
 
-    const event = firstOfType(harness.captured, EVENT_TYPES.AI_FEATURE_UNAVAILABLE)!;
+    const event = firstOfType(
+      harness.captured,
+      EVENT_TYPES.AI_FEATURE_UNAVAILABLE,
+    )!;
     expect(event).toBeDefined();
-    expect(event.payload.reason).toBe("no_public_api_for_observing_assistant_activity");
+    expect(event.payload.reason).toBe(
+      "no_public_api_for_observing_assistant_activity",
+    );
+  });
+
+  it("keeps AI content out of events unless content capture is enabled", () => {
+    const captured: { eventType: string; payload?: Record<string, unknown> }[] =
+      [];
+    const reporter = new AiEventReporter(
+      (input) => captured.push(input),
+      () => false,
+    );
+
+    reporter.reportPrompt({
+      provider: "copilot",
+      prompt_tokens: 12,
+      text: "secret prompt",
+    });
+    reporter.reportResponse({
+      provider: "copilot",
+      completion_tokens: 8,
+      text: "secret response",
+    });
+
+    expect(captured[0].payload).toEqual({
+      provider: "copilot",
+      prompt_tokens: 12,
+    });
+    expect(captured[1].payload).toEqual({
+      provider: "copilot",
+      completion_tokens: 8,
+    });
+  });
+
+  it("includes AI content when content capture is enabled", () => {
+    const captured: { eventType: string; payload?: Record<string, unknown> }[] =
+      [];
+    const reporter = new AiEventReporter(
+      (input) => captured.push(input),
+      () => true,
+    );
+
+    reporter.reportPrompt({ provider: "claude", text: "prompt" });
+    reporter.reportResponse({ provider: "claude", text: "response" });
+
+    expect(captured[0].payload?.text).toBe("prompt");
+    expect(captured[1].payload?.text).toBe("response");
   });
 });
 
@@ -461,7 +596,9 @@ describe("category opt-outs", () => {
     const harness = await makeHarness({ enabled: false });
     registerFileCollectors(harness.deps);
 
-    stub.fire.didSaveTextDocument(stub.makeDocument({ path: "/workspace/my-project/a.ts" }));
+    stub.fire.didSaveTextDocument(
+      stub.makeDocument({ path: "/workspace/my-project/a.ts" }),
+    );
     expect(harness.captured).toHaveLength(0);
   });
 });
