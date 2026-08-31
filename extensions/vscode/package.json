@@ -1,11 +1,27 @@
 {
-  "name": "ide-event-collector",
-  "displayName": "IDE Event Collector",
-  "description": "Collects IDE activity events and ships them to the Universal IDE Event Collection Platform.",
+  "name": "tarfase",
+  "displayName": "Tarfase",
+  "description": "Tarfase helps build Memory Graphs of your codebase by collecting IDE events and sending them to a backend service.",
   "version": "0.1.0",
-  "publisher": "ide-collector",
-  "private": true,
+  "publisher": "Tarfase",
+  "private": false,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hardikqbicorn/tarfase-extension"
+  },
+  "homepage": "https://github.com/hardikqbicorn/tarfase-extension",
+  "bugs": {
+    "url": "https://github.com/hardikqbicorn/tarfase-extension/issues"
+  },
+  "keywords": [
+    "tarfase",
+    "telemetry",
+    "analytics",
+    "productivity",
+    "ide",
+    "developer-tools"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -134,6 +150,11 @@
           "type": "boolean",
           "default": true,
           "description": "Collect AI assistant events where the IDE exposes them."
+        },
+        "telemetry.capture.aiContent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include redacted AI prompt and response text when a cooperating provider reports it."
         },
         "telemetry.throttle.cursorMovedMs": {
           "type": "number",

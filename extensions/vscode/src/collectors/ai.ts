@@ -70,18 +70,29 @@ export const registerAiCollectors: CollectorRegistration = ({ collector }) => {
  *   collector?.ai.reportPrompt({ model: 'claude-opus-5', promptTokens: 120 });
  */
 export class AiEventReporter {
-  constructor(private readonly capture: (input: {
-    eventType: string;
-    payload?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-    file?: { path?: string; language?: string };
-  }) => unknown) {}
+  constructor(
+    private readonly capture: (input: {
+      eventType: string;
+      payload?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+      file?: { path?: string; language?: string };
+    }) => unknown,
+    private readonly isContentCaptureEnabled: () => boolean = () => false,
+  ) {}
 
-  sessionStarted(payload: { provider?: string; model?: string; session_ref?: string } = {}) {
+  sessionStarted(
+    payload: { provider?: string; model?: string; session_ref?: string } = {},
+  ) {
     this.capture({ eventType: EVENT_TYPES.AI_SESSION_STARTED, payload });
   }
 
-  sessionEnded(payload: { provider?: string; duration_ms?: number; turn_count?: number } = {}) {
+  sessionEnded(
+    payload: {
+      provider?: string;
+      duration_ms?: number;
+      turn_count?: number;
+    } = {},
+  ) {
     this.capture({ eventType: EVENT_TYPES.AI_SESSION_ENDED, payload });
   }
 
@@ -98,7 +109,10 @@ export class AiEventReporter {
     has_file_context?: boolean;
     text?: string;
   }) {
-    this.capture({ eventType: EVENT_TYPES.AI_USER_PROMPT, payload });
+    this.capture({
+      eventType: EVENT_TYPES.AI_USER_PROMPT,
+      payload: this.withOptionalContent(payload),
+    });
   }
 
   reportResponse(payload: {
@@ -108,19 +122,31 @@ export class AiEventReporter {
     latency_ms?: number;
     finish_reason?: string;
     error?: string;
+    text?: string;
   }) {
-    this.capture({ eventType: EVENT_TYPES.AI_RESPONSE, payload });
+    this.capture({
+      eventType: EVENT_TYPES.AI_RESPONSE,
+      payload: this.withOptionalContent(payload),
+    });
   }
 
   agentInvoked(payload: { agent?: string; provider?: string; task?: string }) {
     this.capture({ eventType: EVENT_TYPES.AI_AGENT_INVOKED, payload });
   }
 
-  toolInvoked(payload: { tool?: string; agent?: string; arguments_count?: number }) {
+  toolInvoked(payload: {
+    tool?: string;
+    agent?: string;
+    arguments_count?: number;
+  }) {
     this.capture({ eventType: EVENT_TYPES.AI_TOOL_INVOKED, payload });
   }
 
-  toolResult(payload: { tool?: string; succeeded?: boolean; duration_ms?: number }) {
+  toolResult(payload: {
+    tool?: string;
+    succeeded?: boolean;
+    duration_ms?: number;
+  }) {
     this.capture({ eventType: EVENT_TYPES.AI_TOOL_RESULT, payload });
   }
 
@@ -150,5 +176,11 @@ export class AiEventReporter {
       file: payload.file,
       payload: { ...payload, file: undefined },
     });
+  }
+
+  private withOptionalContent<T extends { text?: string }>(payload: T): T {
+    if (this.isContentCaptureEnabled()) return payload;
+    const { text: _text, ...metadata } = payload;
+    return metadata as T;
   }
 }

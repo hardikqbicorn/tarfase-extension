@@ -59,28 +59,39 @@ export async function activate(context: vscode.ExtensionContext) {
   // ---- can turn it on, register, and inspect status.
   context.subscriptions.push(
     vscode.commands.registerCommand("ideCollector.register", () =>
-      registerInstallation(context, registrationClient, logger)
+      registerInstallation(context, registrationClient, logger),
     ),
-    vscode.commands.registerCommand("ideCollector.showStatus", () => showStatus(registrationClient)),
+    vscode.commands.registerCommand("ideCollector.showStatus", () =>
+      showStatus(registrationClient),
+    ),
     vscode.commands.registerCommand("ideCollector.flushNow", async () => {
       await collector?.flush();
       vscode.window.showInformationMessage(
-        `IDE Collector: flushed. ${collector?.getMetrics().queueSize ?? 0} events still queued.`
+        `IDE Collector: flushed. ${collector?.getMetrics().queueSize ?? 0} events still queued.`,
       );
     }),
-    vscode.commands.registerCommand("ideCollector.toggleTelemetry", async () => {
-      const settings = vscode.workspace.getConfiguration("telemetry");
-      const next = !settings.get<boolean>("enabled", false);
-      await settings.update("enabled", next, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage(
-        `IDE Collector: telemetry ${next ? "enabled" : "disabled"}.`
-      );
-    }),
+    vscode.commands.registerCommand(
+      "ideCollector.toggleTelemetry",
+      async () => {
+        const settings = vscode.workspace.getConfiguration("telemetry");
+        const next = !settings.get<boolean>("enabled", false);
+        await settings.update(
+          "enabled",
+          next,
+          vscode.ConfigurationTarget.Global,
+        );
+        vscode.window.showInformationMessage(
+          `IDE Collector: telemetry ${next ? "enabled" : "disabled"}.`,
+        );
+      },
+    ),
     vscode.commands.registerCommand("ideCollector.signOut", async () => {
       await registrationClient.clearCredentials();
       await stopCollector();
-      vscode.window.showInformationMessage("IDE Collector: credentials cleared.");
-    })
+      vscode.window.showInformationMessage(
+        "IDE Collector: credentials cleared.",
+      );
+    }),
   );
 
   // Restart the pipeline when relevant settings change.
@@ -92,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext) {
           await startCollector(context, registrationClient, logger);
         });
       }
-    })
+    }),
   );
 
   await queueLifecycle(() => startCollector(context, registrationClient, logger));
@@ -103,7 +114,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Public API other extensions use to contribute AI events.
   return {
-    ai: new AiEventReporter((input) => collector?.capture(input)),
+    ai: new AiEventReporter(
+      (input) => collector?.capture(input),
+      () => readConfig().capture.aiContent,
+    ),
     getMetrics: () => collector?.getMetrics(),
   };
 }
@@ -112,7 +126,10 @@ export async function deactivate() {
   // Emit a session-end marker and drain the queue to disk so nothing is lost
   // across an IDE restart.
   collector?.capture({ eventType: EVENT_TYPES.SESSION_ENDED, payload: {} });
-  collector?.capture({ eventType: EVENT_TYPES.EXTENSION_DEACTIVATED, payload: {} });
+  collector?.capture({
+    eventType: EVENT_TYPES.EXTENSION_DEACTIVATED,
+    payload: {},
+  });
   await collector?.flush().catch(() => undefined);
   // Through the queue, so a restart still in flight finishes before the
   // collector is torn down rather than racing it.
@@ -173,7 +190,7 @@ function watchForStagedCredential(
 async function startCollector(
   context: vscode.ExtensionContext,
   registrationClient: RegistrationClient,
-  logger: Logger
+  logger: Logger,
 ): Promise<void> {
   const config = readConfig();
 
@@ -190,12 +207,14 @@ async function startCollector(
 
   const credentials = await registrationClient.getStoredCredentials();
   if (!credentials) {
-    logger.warn("no installation credentials; run 'IDE Collector: Register This Installation'");
+    logger.warn(
+      "no installation credentials; run 'IDE Collector: Register This Installation'",
+    );
     updateStatusBar("$(key) Collector: register");
     vscode.window
       .showInformationMessage(
         "IDE Event Collector is enabled but this installation is not registered.",
-        "Register now"
+        "Register now",
       )
       .then((choice) => {
         if (choice === "Register now") {
@@ -211,13 +230,17 @@ async function startCollector(
   const contextProvider = new VSCodeContextProvider(
     IDE_NAME,
     vscode.version ?? "unknown",
-    git
+    git,
   );
 
   // Queue file lives in the extension's own storage directory, which is
   // per-user and outside any workspace, so queued events are never committed.
   const queuePath = join(context.globalStorageUri.fsPath, "event-queue.json");
-  const persistence = await buildPersistence(context, queuePath, config.encryptLocalQueue);
+  const persistence = await buildPersistence(
+    context,
+    queuePath,
+    config.encryptLocalQueue,
+  );
 
   const queue = new EventQueue({
     maxQueueSize: config.maxQueueSize,
@@ -260,7 +283,10 @@ async function startCollector(
   adapter = new VSCodeAdapter(IDE_NAME, config, contextProvider, git);
   adapter.activate(collector);
 
-  logger.info("collector active", { ide: IDE_NAME, capabilities: adapter.capabilities });
+  logger.info("collector active", {
+    ide: IDE_NAME,
+    capabilities: adapter.capabilities,
+  });
   startStatusBar(context);
 }
 
@@ -362,7 +388,7 @@ async function stopCollector(): Promise<void> {
 async function buildPersistence(
   context: vscode.ExtensionContext,
   queuePath: string,
-  encrypt: boolean
+  encrypt: boolean,
 ): Promise<QueuePersistence> {
   const fileStore = new FileSystemQueuePersistence(queuePath);
   if (!encrypt) return fileStore;
@@ -378,7 +404,7 @@ async function buildPersistence(
 async function registerInstallation(
   context: vscode.ExtensionContext,
   registrationClient: RegistrationClient,
-  logger: Logger
+  logger: Logger,
 ): Promise<void> {
   const config = readConfig();
 
@@ -387,7 +413,8 @@ async function registerInstallation(
     prompt: "Paste the enrollment code issued by your platform administrator",
     password: true,
     ignoreFocusOut: true,
-    placeHolder: "Leave blank only if your backend allows open enrollment (development)",
+    placeHolder:
+      "Leave blank only if your backend allows open enrollment (development)",
   });
 
   // `undefined` means the user dismissed the box; an empty string is a
@@ -402,9 +429,11 @@ async function registerInstallation(
       machineId: vscode.env.machineId,
     });
 
-    logger.info("installation registered", { installationId: credentials.installationId });
+    logger.info("installation registered", {
+      installationId: credentials.installationId,
+    });
     vscode.window.showInformationMessage(
-      `IDE Event Collector registered (installation ${credentials.installationId.slice(0, 8)}...).`
+      `IDE Event Collector registered (installation ${credentials.installationId.slice(0, 8)}...).`,
     );
 
     await stopCollector();
@@ -412,11 +441,15 @@ async function registerInstallation(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("registration failed", { error: message });
-    vscode.window.showErrorMessage(`IDE Event Collector registration failed: ${message}`);
+    vscode.window.showErrorMessage(
+      `IDE Event Collector registration failed: ${message}`,
+    );
   }
 }
 
-async function showStatus(registrationClient: RegistrationClient): Promise<void> {
+async function showStatus(
+  registrationClient: RegistrationClient,
+): Promise<void> {
   const credentials = await registrationClient.getStoredCredentials();
   const metrics = collector?.getMetrics();
 
@@ -441,7 +474,10 @@ async function showStatus(registrationClient: RegistrationClient): Promise<void>
 
 function startStatusBar(context: vscode.ExtensionContext) {
   if (!statusBarItem) {
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      100,
+    );
     statusBarItem.command = "ideCollector.showStatus";
     context.subscriptions.push(statusBarItem);
   }
@@ -453,7 +489,7 @@ function startStatusBar(context: vscode.ExtensionContext) {
     updateStatusBar(
       metrics.queueSize > 0
         ? `$(cloud-upload) Collector ${metrics.queueSize} queued`
-        : "$(pulse) Collector on"
+        : "$(pulse) Collector on",
     );
   }, 10_000);
   (interval as unknown as { unref?: () => void }).unref?.();

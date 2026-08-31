@@ -9,6 +9,42 @@ import { resolve } from "path";
  * Existing process environment always wins, so `DATABASE_URL=... npm run migrate`
  * overrides the file.
  */
+function stripInlineComment(value: string): string {
+  let inSingle = false;
+  let inDouble = false;
+  let escaped = false;
+
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\" && inDouble) {
+      escaped = true;
+      continue;
+    }
+
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      continue;
+    }
+
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      continue;
+    }
+
+    if (ch === "#" && !inSingle && !inDouble) {
+      return value.slice(0, i).trimEnd();
+    }
+  }
+
+  return value.trim();
+}
+
 export function loadDotEnv(file = ".env"): void {
   const path = resolve(process.cwd(), file);
   if (!existsSync(path)) return;
@@ -21,7 +57,7 @@ export function loadDotEnv(file = ".env"): void {
     if (eq === -1) continue;
 
     const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
+    let value = stripInlineComment(line.slice(eq + 1));
 
     // Strip matching surrounding quotes, which are common in .env files.
     if (
@@ -31,9 +67,7 @@ export function loadDotEnv(file = ".env"): void {
       value = value.slice(1, -1);
     }
 
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-    }
+    process.env[key] = value;
   }
 }
 
@@ -46,7 +80,7 @@ export function requireDatabaseUrl(): string {
         "",
         "Set it in .env (copy .env.example), or pass it inline:",
         "  DATABASE_URL='postgresql://...' npm run migrate",
-      ].join("\n")
+      ].join("\n"),
     );
     process.exit(1);
   }

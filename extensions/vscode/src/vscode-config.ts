@@ -12,8 +12,14 @@ export function readConfig(): CollectorConfig {
 
   return mergeConfig({
     enabled: cfg.get<boolean>("enabled", false),
-    ingestionEndpoint: cfg.get<string>("ingestionEndpoint", "http://localhost:8080"),
-    registrationEndpoint: cfg.get<string>("registrationEndpoint", "http://localhost:8081"),
+    ingestionEndpoint: cfg.get<string>(
+      "ingestionEndpoint",
+      "http://localhost:8080",
+    ),
+    registrationEndpoint: cfg.get<string>(
+      "registrationEndpoint",
+      "http://localhost:8081",
+    ),
     batchSize: cfg.get<number>("batchSize", 50),
     flushIntervalMs: cfg.get<number>("flushInterval", 5000),
     maxQueueSize: cfg.get<number>("maxQueueSize", 10_000),
@@ -30,6 +36,7 @@ export function readConfig(): CollectorConfig {
       git: cfg.get<boolean>("capture.git", true),
       buildTestDebug: cfg.get<boolean>("capture.buildTestDebug", true),
       ai: cfg.get<boolean>("capture.ai", true),
+      aiContent: cfg.get<boolean>("capture.aiContent", false),
     },
     throttle: {
       cursorMovedMs: cfg.get<number>("throttle.cursorMovedMs", 2000),

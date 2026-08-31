@@ -40,6 +40,7 @@ export interface CollectorConfig {
     git: boolean;
     buildTestDebug: boolean;
     ai: boolean;
+    aiContent: boolean;
   };
 
   /** When true, file paths are hashed rather than sent verbatim. */
@@ -77,6 +78,7 @@ export const DEFAULT_CONFIG: CollectorConfig = {
     git: true,
     buildTestDebug: true,
     ai: true,
+    aiContent: false,
   },
   hashFilePaths: false,
   encryptLocalQueue: true,
@@ -84,7 +86,9 @@ export const DEFAULT_CONFIG: CollectorConfig = {
   logLevel: "info",
 };
 
-export function mergeConfig(partial: Partial<CollectorConfig>): CollectorConfig {
+export function mergeConfig(
+  partial: Partial<CollectorConfig>,
+): CollectorConfig {
   return {
     ...DEFAULT_CONFIG,
     ...partial,

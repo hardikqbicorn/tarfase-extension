@@ -279,3 +279,9 @@ collector?.getMetrics();  // queue size, sent/dropped counts, last error
 ```
 
 See `extensions/vscode/src/collectors/ai.ts` for the full reporter surface.
+
+Prompt and response text can also be reported with the `text` property, but is
+removed unless the user explicitly enables `telemetry.capture.aiContent`. AI
+metadata remains available when `telemetry.capture.ai` is enabled. The
+collector cannot observe private conversations belonging to Copilot, Claude,
+Cursor, or another extension; those providers must call this reporter API.
