@@ -1,0 +1,18 @@
+node_modules/
+dist/
+out/
+build/
+*.vsix
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+.vscode-test/
+*.tsbuildinfo
+.idea/
+*.iml
+
+# Database CA certificates (downloaded from your provider's dashboard)
+certs/*.crt
+*.crt

@@ -1,0 +1,15 @@
+{
+  "name": "@ide-collector/crypto",
+  "version": "0.1.0",
+  "description": "Secret redaction engine and local encryption helpers shared by every extension and backend service.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

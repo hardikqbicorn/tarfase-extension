@@ -1,0 +1,15 @@
+# The .vsix ships the bundle only. Everything below is either build input,
+# build output that the bundle replaces, or something that must never be
+# published.
+.env
+.env.*
+node_modules/**
+.git/**
+.gitignore
+src/**
+dist/**
+test/**
+tsconfig*.json
+*.tsbuildinfo
+esbuild.mjs
+bundle/**/*.map

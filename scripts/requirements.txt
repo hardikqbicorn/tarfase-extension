@@ -1,0 +1,7 @@
+# Optional Python tooling for ad-hoc database checks and queries.
+#   pip install -r scripts/requirements.txt
+#
+# psycopg2-binary, not psycopg2: the latter compiles from source and needs
+# libpq plus build tools, which commonly fails on macOS.
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.1
