@@ -239,7 +239,7 @@ Rather than pretend otherwise, the platform does two things:
 
 ```ts
 const collector = vscode.extensions
-  .getExtension("ide-collector.ide-event-collector")?.exports;
+   .getExtension("Tarfase.tarfase")?.exports;
 
 collector?.ai.reportPrompt({ provider: "copilot", model: "gpt-5", prompt_tokens: 120 });
 collector?.ai.codeGenerated({ lines_generated: 24, accepted: true });

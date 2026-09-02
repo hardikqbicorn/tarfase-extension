@@ -55,7 +55,7 @@ A cooperating extension can push AI events into the pipeline:
 
 ```ts
 const collector = vscode.extensions
-  .getExtension("ide-collector.ide-event-collector")
+  .getExtension("Tarfase.tarfase")
   ?.exports;
 
 collector?.ai.reportPrompt({ provider: "cursor", model: "gpt-5", prompt_tokens: 120 });

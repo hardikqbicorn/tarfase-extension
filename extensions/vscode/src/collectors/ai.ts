@@ -66,7 +66,7 @@ export const registerAiCollectors: CollectorRegistration = ({ collector }) => {
  * Public surface other extensions use to contribute AI events:
  *
  *   const collector = vscode.extensions
- *     .getExtension('ide-collector.ide-event-collector')?.exports;
+ *     .getExtension('Tarfase.tarfase')?.exports;
  *   collector?.ai.reportPrompt({ model: 'claude-opus-5', promptTokens: 120 });
  */
 export class AiEventReporter {

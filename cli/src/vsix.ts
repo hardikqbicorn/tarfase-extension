@@ -15,7 +15,7 @@ import { pipeline } from "stream/promises";
  */
 
 export const DEFAULT_REPO = "hardikqbicorn/tarfase-extension";
-export const EXTENSION_ID = "ide-collector.ide-event-collector";
+export const EXTENSION_ID = "Tarfase.tarfase";
 
 export interface ReleaseAsset {
   name: string;
@@ -28,7 +28,9 @@ export interface ReleaseInfo {
 }
 
 /** Finds a .vsix built locally in the repo, if the CLI is run from a checkout. */
-export async function findLocalVsix(searchDir: string): Promise<string | undefined> {
+export async function findLocalVsix(
+  searchDir: string,
+): Promise<string | undefined> {
   try {
     const entries = await readdir(searchDir);
     const candidates = entries.filter((e) => e.endsWith(".vsix")).sort();
@@ -50,7 +52,10 @@ export async function fileExists(path: string): Promise<boolean> {
 }
 
 export interface FetchLike {
-  (url: string, init?: { headers?: Record<string, string> }): Promise<{
+  (
+    url: string,
+    init?: { headers?: Record<string, string> },
+  ): Promise<{
     ok: boolean;
     status: number;
     statusText: string;
@@ -70,10 +75,12 @@ export async function fetchReleaseInfo(
   repo: string,
   version: string,
   fetchImpl: FetchLike = globalThis.fetch as unknown as FetchLike,
-  token?: string
+  token?: string,
 ): Promise<ReleaseInfo> {
   const path =
-    version === "latest" ? "releases/latest" : `releases/tags/${encodeURIComponent(version)}`;
+    version === "latest"
+      ? "releases/latest"
+      : `releases/tags/${encodeURIComponent(version)}`;
   const url = `https://api.github.com/repos/${repo}/${path}`;
 
   const headers: Record<string, string> = {
@@ -90,16 +97,18 @@ export async function fetchReleaseInfo(
         `No release "${version}" found for ${repo}.\n` +
           `If the extension has not been released yet, build it locally and install that:\n` +
           `  npm run build -w extensions/vscode && npx vsce package\n` +
-          `  ide-collector install --vsix extensions/vscode/<file>.vsix`
+          `  ide-collector install --vsix extensions/vscode/<file>.vsix`,
       );
     }
     if (response.status === 403) {
       throw new Error(
         `GitHub API rate limit or access denied (403).\n` +
-          `Set GITHUB_TOKEN to raise the limit, or pass --vsix with a local file.`
+          `Set GITHUB_TOKEN to raise the limit, or pass --vsix with a local file.`,
       );
     }
-    throw new Error(`GitHub API returned ${response.status} ${response.statusText}`);
+    throw new Error(
+      `GitHub API returned ${response.status} ${response.statusText}`,
+    );
   }
 
   return (await response.json()) as ReleaseInfo;
@@ -110,7 +119,7 @@ export function selectVsixAsset(release: ReleaseInfo): ReleaseAsset {
   if (!asset) {
     throw new Error(
       `Release ${release.tag_name} has no .vsix asset attached.\n` +
-        `Assets present: ${release.assets?.map((a) => a.name).join(", ") || "none"}`
+        `Assets present: ${release.assets?.map((a) => a.name).join(", ") || "none"}`,
     );
   }
   return asset;
@@ -120,7 +129,7 @@ export function selectVsixAsset(release: ReleaseInfo): ReleaseAsset {
 export async function downloadAsset(
   asset: ReleaseAsset,
   fetchImpl: FetchLike = globalThis.fetch as unknown as FetchLike,
-  targetDir = join(tmpdir(), "ide-collector-cli")
+  targetDir = join(tmpdir(), "ide-collector-cli"),
 ): Promise<string> {
   await mkdir(targetDir, { recursive: true });
   const target = join(targetDir, asset.name);
@@ -129,14 +138,19 @@ export async function downloadAsset(
     headers: { "user-agent": "ide-collector-cli" },
   });
   if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Download failed: ${response.status} ${response.statusText}`,
+    );
   }
 
   await mkdir(dirname(target), { recursive: true });
 
   if (response.body) {
     // Stream to disk so a large artifact is not held in memory.
-    await pipeline(Readable.fromWeb(response.body as never), createWriteStream(target));
+    await pipeline(
+      Readable.fromWeb(response.body as never),
+      createWriteStream(target),
+    );
   } else {
     const buffer = Buffer.from(await response.arrayBuffer());
     await pipeline(Readable.from(buffer), createWriteStream(target));
@@ -146,7 +160,9 @@ export async function downloadAsset(
 }
 
 /** Walks up from `startDir` looking for a repo checkout containing the extension. */
-export async function findRepoExtensionDir(startDir: string): Promise<string | undefined> {
+export async function findRepoExtensionDir(
+  startDir: string,
+): Promise<string | undefined> {
   let current = resolve(startDir);
 
   for (let depth = 0; depth < 6; depth++) {
