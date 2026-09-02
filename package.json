@@ -10,7 +10,7 @@
     "cli"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && npm run bundle -w extensions/vscode",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/integration",
@@ -23,8 +23,9 @@
     "test:db": "./scripts/test-db.sh",
     "migrate": "tsx scripts/migrate.ts",
     "check:db": "tsx scripts/check-db.ts",
-    "clean": "tsc -b --clean",
-    "rebuild": "npm run clean && npm run build"
+    "clean": "tsc -b --clean && node -e \"require('fs').rmSync('extensions/vscode/bundle',{recursive:true,force:true})\"",
+    "rebuild": "npm run clean && npm run build",
+    "quickstart": "tsx scripts/quickstart.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.15",

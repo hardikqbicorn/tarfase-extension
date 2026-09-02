@@ -1,13 +1,5 @@
 import { ParsedArgs, optionBool, optionString } from "../args";
-import {
-  DEFAULT_REPO,
-  downloadAsset,
-  fetchReleaseInfo,
-  fileExists,
-  findLocalVsix,
-  findRepoExtensionDir,
-  selectVsixAsset,
-} from "../vsix";
+import { DEFAULT_REPO, resolveVsix } from "../vsix";
 import { detectIdes, installExtension, selectIdes } from "../ide";
 import { applyCollectorSettings, readSettings, writeSettings } from "../settings";
 import { fail, heading, indent, info, ok, step, warn } from "../output";
@@ -63,37 +55,23 @@ export async function installCommand(args: ParsedArgs): Promise<number> {
 
   // ---- Resolve the .vsix -----------------------------------------------------
   heading("Resolving extension package");
-  let vsixPath: string | undefined;
-
-  if (explicitVsix) {
-    if (!(await fileExists(explicitVsix))) {
-      fail(`No file at ${explicitVsix}`);
-      return 1;
-    }
-    vsixPath = explicitVsix;
-    ok(`Using ${vsixPath}`);
-  } else {
-    const repoExtensionDir = await findRepoExtensionDir(process.cwd());
-    if (repoExtensionDir) {
-      const local = await findLocalVsix(repoExtensionDir);
-      if (local) {
-        vsixPath = local;
-        ok(`Using locally built ${local}`);
-      }
-    }
-  }
-
-  if (!vsixPath) {
-    step(`Fetching ${version} release from ${repo}`);
-    try {
-      const release = await fetchReleaseInfo(repo, version, undefined, process.env.GITHUB_TOKEN);
-      const asset = selectVsixAsset(release);
-      vsixPath = await downloadAsset(asset);
-      ok(`Downloaded ${asset.name} (${release.tag_name})`);
-    } catch (err) {
-      fail("Could not obtain the extension package.", err instanceof Error ? err.message : String(err));
-      return 1;
-    }
+  let vsixPath: string;
+  try {
+    const resolved = await resolveVsix({
+      explicit: explicitVsix,
+      repo,
+      version,
+      token: process.env.GITHUB_TOKEN,
+      onProgress: step,
+    });
+    vsixPath = resolved.path;
+    ok(resolved.description);
+  } catch (err) {
+    fail(
+      "Could not obtain the extension package.",
+      err instanceof Error ? err.message : String(err)
+    );
+    return 1;
   }
 
   // ---- Install ---------------------------------------------------------------

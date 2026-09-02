@@ -13,7 +13,38 @@ VS Code (your machine)
 
 - Node.js 18+ and npm
 - Docker with Compose v2 (`docker compose version`)
-- A Supabase project, and its database password
+- A Supabase project and its database password, if you want events stored
+  there. `npm run quickstart` falls back to a bundled PostgreSQL without one.
+
+---
+
+## The short version
+
+```bash
+git clone https://github.com/hardikqbicorn/tarfase-extension.git
+cd tarfase-extension
+npm install
+npm run quickstart
+```
+
+`quickstart` does sections 1 through 5 below: builds the workspace, starts
+Kafka and the three services, applies the schema, and waits until the pipeline
+reports ready. With no `.env` it generates one with real random secrets and
+uses the bundled PostgreSQL, so this works before you have a Supabase project.
+To use Supabase, put your Session pooler string in `.env` as `DATABASE_URL`
+first and re-run.
+
+Then, in another terminal:
+
+```bash
+npx ide-collector setup
+```
+
+That installs the extension, asks what you consent to, and registers. Open your
+IDE and events start flowing. Skip to section 7 to watch them arrive.
+
+The rest of this document is the same work one step at a time, which is what
+you want when a step fails.
 
 ---
 
@@ -153,28 +184,51 @@ docker compose logs consumer --tail 50
 
 ---
 
-## 6. Run the VS Code extension
+## 6. Install the extension
+
+```bash
+npx ide-collector setup
+```
+
+`npm install` links the CLI from this checkout into `node_modules/.bin`, which
+is what `npx` finds here. Once the CLI is published, people outside the repo
+run `npx @ide-collector/cli setup` instead — same command, same flags.
+
+It detects your IDE, installs the extension, prints what is and is not
+collected, waits for you to agree, points the extension at the services you
+just started, registers the installation, and stages the credential. The
+extension picks that up within a few seconds — there is nothing to restart.
+
+Then generate some events: open a file, type, save it, run a build task, switch
+git branches. Check it is working with:
+
+```bash
+npx ide-collector doctor
+```
+
+Open enrollment is on in development (`ALLOW_OPEN_ENROLLMENT=true`), so no
+enrollment code is needed here.
+
+### Running from source instead
+
+When you are working on the extension itself:
 
 ```bash
 code --extensionDevelopmentPath="$(pwd)/extensions/vscode"
 ```
 
-This opens a second VS Code window ("Extension Development Host") with the
-extension loaded. In **that** window:
+This opens an "Extension Development Host" window with the extension loaded
+from `dist/`. In that window:
 
 1. **Enable collection.** Settings (`Cmd/Ctrl+,`) → search `telemetry.enabled`
-   → tick it. Collection is opt-in and off by default, so nothing is captured
-   until you do this.
+   → tick it. Collection is opt-in and off by default.
 
-2. **Register.** `Cmd/Ctrl+Shift+P` → **"IDE Collector: Register This
-   Installation"**. Leave the enrollment code **blank** and press Enter —
-   `ALLOW_OPEN_ENROLLMENT=true` in development lets it self-enroll. You should
-   see "IDE Event Collector registered".
+2. **Register.** Either run `npx ide-collector login` in a terminal and
+   let the extension import the credential, or use `Cmd/Ctrl+Shift+P` →
+   **"IDE Collector: Register This Installation"** and leave the enrollment
+   code blank.
 
-3. **Generate events.** Open a file, type, save it, run a build task, switch
-   git branches.
-
-4. **Check status.** `Cmd/Ctrl+Shift+P` → **"IDE Collector: Show Status"**.
+3. **Check status.** `Cmd/Ctrl+Shift+P` → **"IDE Collector: Show Status"**.
    The output channel reports queue size, events captured, events sent, and
    the last error. Events flush every 5 seconds by default, or force one with
    **"IDE Collector: Flush Queued Events Now"**.
@@ -281,7 +335,10 @@ query tool, not a second persistence layer.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run build` | Build all packages and services |
+| `npm run quickstart` | Build, start everything, migrate, wait for ready |
+| `npx ide-collector setup` | Install and register the extension |
+| `npm run build` | Build all packages, services, and the extension bundle |
+| `npm run package -w extensions/vscode` | Build a `.vsix` |
 | `npm run clean` / `npm run rebuild` | Clear the build cache and outputs |
 | `npm run migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run migrate -- --dry-run` | Preview migrations |
@@ -306,7 +363,8 @@ query tool, not a second persistence layer.
 | `self-signed certificate in certificate chain` | Supabase's private CA | Set `DATABASE_CA_CERT_FILE`, or `DATABASE_SSL=require` |
 | `relation "raw_events" does not exist` | Migrations not applied | `npm run migrate` |
 | Extension registers but nothing arrives | Telemetry disabled, or ingestion down | Check "Show Status"; `curl localhost:8080/health` |
-| Extension: "not registered" prompt | No stored credential | Run the Register command |
+| Extension: "not registered" prompt | No stored credential | `npx ide-collector login` |
+| Staged credential not picked up | Watch failed on this filesystem | Focus the IDE window, or reload it |
 | Kafka container restarts on boot | Stale KRaft volume | `docker compose down -v` |
 
 For any database problem, run `npm run check:db` first.

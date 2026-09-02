@@ -15,6 +15,14 @@ import { pipeline } from "stream/promises";
  */
 
 export const DEFAULT_REPO = "hardikqbicorn/tarfase-extension";
+/**
+ * `publisher.name` from extensions/vscode/package.json - the id VS Code
+ * reports from `--list-extensions` and accepts for `--uninstall-extension`.
+ *
+ * Duplicated here rather than imported because the CLI ships without the
+ * repository. A test asserts the two stay in step, which is how a rename gets
+ * caught rather than silently breaking `doctor` and `uninstall`.
+ */
 export const EXTENSION_ID = "Tarfase.tarfase";
 
 export interface ReleaseAsset {
@@ -179,4 +187,56 @@ export async function findRepoExtensionDir(
   }
 
   return undefined;
+}
+
+export interface ResolvedVsix {
+  path: string;
+  /** Which of the three sources it came from, for reporting. */
+  origin: "explicit" | "local-build" | "release";
+  description: string;
+}
+
+/**
+ * Applies the three-source order above and reports which one won.
+ *
+ * Shared by `install` and `setup` so the two cannot drift into resolving the
+ * package differently - the surprise of `setup` downloading a release while
+ * `install` picks up a stale local build would be hard to diagnose.
+ */
+export async function resolveVsix(options: {
+  explicit?: string;
+  repo?: string;
+  version?: string;
+  cwd?: string;
+  token?: string;
+  onProgress?: (message: string) => void;
+}): Promise<ResolvedVsix> {
+  const { explicit, onProgress } = options;
+  const repo = options.repo ?? DEFAULT_REPO;
+  const version = options.version ?? "latest";
+
+  if (explicit) {
+    if (!(await fileExists(explicit))) {
+      throw new Error(`No file at ${explicit}`);
+    }
+    return { path: explicit, origin: "explicit", description: `Using ${explicit}` };
+  }
+
+  const repoExtensionDir = await findRepoExtensionDir(options.cwd ?? process.cwd());
+  if (repoExtensionDir) {
+    const local = await findLocalVsix(repoExtensionDir);
+    if (local) {
+      return { path: local, origin: "local-build", description: `Using locally built ${local}` };
+    }
+  }
+
+  onProgress?.(`Fetching the ${version} release from ${repo}`);
+  const release = await fetchReleaseInfo(repo, version, undefined, options.token);
+  const asset = selectVsixAsset(release);
+  const path = await downloadAsset(asset);
+  return {
+    path,
+    origin: "release",
+    description: `Downloaded ${asset.name} (${release.tag_name})`,
+  };
 }

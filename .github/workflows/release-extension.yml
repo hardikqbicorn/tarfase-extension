@@ -42,31 +42,34 @@ jobs:
       - name: Test
         run: npm test
 
+      # The .vsix ships no node_modules, and the extension imports four
+      # workspace packages, so it has to be bundled or it fails on activation.
       - name: Package extension
         id: package
         run: |
           cd extensions/vscode
-          npx --yes @vscode/vsce package --no-dependencies --out ide-event-collector.vsix
-          echo "vsix=extensions/vscode/ide-event-collector.vsix" >> "$GITHUB_OUTPUT"
+          npm run bundle:production
+          npx --yes @vscode/vsce package --no-dependencies --out tarfase.vsix
+          echo "vsix=extensions/vscode/tarfase.vsix" >> "$GITHUB_OUTPUT"
 
       - name: Checksum
         run: |
           cd extensions/vscode
-          sha256sum ide-event-collector.vsix > ide-event-collector.vsix.sha256
-          cat ide-event-collector.vsix.sha256
+          sha256sum tarfase.vsix > tarfase.vsix.sha256
+          cat tarfase.vsix.sha256
 
       - uses: actions/upload-artifact@v4
         with:
           name: vsix
           path: |
-            extensions/vscode/ide-event-collector.vsix
-            extensions/vscode/ide-event-collector.vsix.sha256
+            extensions/vscode/tarfase.vsix
+            extensions/vscode/tarfase.vsix.sha256
 
       - name: Attach to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            extensions/vscode/ide-event-collector.vsix
-            extensions/vscode/ide-event-collector.vsix.sha256
+            extensions/vscode/tarfase.vsix
+            extensions/vscode/tarfase.vsix.sha256
           generate_release_notes: true
