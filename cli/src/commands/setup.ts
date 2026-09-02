@@ -27,6 +27,8 @@ const CONSENT_NOTICE = `
 Collection is off until you agree. Once on, the extension records:
 
   - files opened, saved, created, renamed and deleted (paths and languages)
+  - which functions, classes and variables each save changed, by name, and
+    how many lines - never the code itself
   - editing activity: cursor moves, selections, document changes
   - git activity: branch checkouts, commits, pulls, pushes, merges
   - builds, tests, debug sessions and diagnostics
@@ -37,7 +39,8 @@ It never records:
 
   - passwords, API keys, tokens or other credentials
   - environment variables or the contents of .env files
-  - private keys, and the contents of your files
+  - private keys, and the contents of your files - no line of source code
+    leaves your machine, only its structure
   - your command arguments beyond the command name
 
 Anything matching a secret pattern is redacted before it leaves your machine,

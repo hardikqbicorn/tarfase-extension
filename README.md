@@ -244,7 +244,30 @@ content becomes counts, diagnostic messages and breakpoint conditions are
 dropped (they quote source), terminal output is never read, and paths outside
 the workspace are reduced to a basename.
 
-### 4. IDE knowledge stops at the adapter
+### 4. What changed, not just that something changed
+
+A save reports which functions, classes and variables the edit landed in:
+
+```json
+{ "qualified_name": "OrderService.calculateTotal", "kind": "method",
+  "lines_added": 2, "lines_removed": 1, "signature_changed": false }
+```
+
+The `kind` is not inferred. VS Code's document symbol provider hands back the
+tree that the language server for that file already parsed, so "method" is what
+the TypeScript server says it is — exact for every language the developer has
+tooling for, and impossible to hallucinate. That is why there is no model in
+this path.
+
+The diff runs in the extension and the lines are then discarded. What leaves
+the machine is names, kinds and counts — including `lines_unchanged` and
+`symbols_unchanged_count`, so you can tell a two-line fix from a rewrite.
+
+Query it with the `symbol_changes`, `file_change_summary` and `symbol_hotspots`
+views. A symbol with a high `change_count` and several `distinct_editors` is
+the classic contested-code signal.
+
+### 5. IDE knowledge stops at the adapter
 
 Adapters implement `IdeAdapter` and call `collector.capture(...)`. They never
 build an envelope, touch the network, or know Kafka exists. That is what makes

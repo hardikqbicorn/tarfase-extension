@@ -41,6 +41,11 @@ export interface CollectorConfig {
     buildTestDebug: boolean;
     ai: boolean;
     aiContent: boolean;
+    /**
+     * Attribute each save to the functions, classes and variables it touched.
+     * Sends symbol names, kinds and line counts - never source lines.
+     */
+    codeStructure: boolean;
   };
 
   /** When true, file paths are hashed rather than sent verbatim. */
@@ -79,6 +84,7 @@ export const DEFAULT_CONFIG: CollectorConfig = {
     buildTestDebug: true,
     ai: true,
     aiContent: false,
+    codeStructure: true,
   },
   hashFilePaths: false,
   encryptLocalQueue: true,

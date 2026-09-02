@@ -94,6 +94,61 @@ bump must land in `packages/event-schema/src/schema.ts` **and**
 `file.opened` · `file.closed` · `file.created` · `file.deleted` ·
 `file.renamed` · `file.saved` · `file.modified`
 
+### Code structure
+`code.symbols_changed`
+
+Emitted once per save that changed something. Answers *what* changed, not just
+how much: which functions, classes and variables the edit landed in, and how
+much of the file it left alone.
+
+```json
+{
+  "lines_added": 2,
+  "lines_removed": 1,
+  "lines_unchanged": 412,
+  "hunk_count": 1,
+  "symbols_changed": [
+    {
+      "name": "calculateTotal",
+      "qualified_name": "OrderService.calculateTotal",
+      "kind": "method",
+      "lines_added": 2,
+      "lines_removed": 1,
+      "edit_count": 1,
+      "signature_changed": false
+    }
+  ],
+  "symbols_changed_count": 1,
+  "symbols_unchanged_count": 18,
+  "symbols_total": 19,
+  "kinds_changed": ["method"],
+  "unattributed_hunks": 0,
+  "symbols_truncated": false,
+  "approximate": false,
+  "symbols_status": "ok"
+}
+```
+
+**No source code is included.** Names, kinds, line numbers and counts only —
+the diff is computed in the extension and the lines are discarded.
+
+`kind` comes from the language server that owns the file, via VS Code's
+document symbol provider, so it is exact for any language the developer has
+tooling for and cannot be a guess. No model is involved.
+
+| Field | Meaning |
+| --- | --- |
+| `qualified_name` | Dotted path through enclosing symbols |
+| `signature_changed` | The declaration line itself was edited |
+| `edit_count` | Separate edit locations inside that symbol |
+| `unattributed_hunks` | Edits outside every symbol — imports, top-level statements, or the deletion of a whole symbol, which is no longer in the tree to attribute to |
+| `symbols_truncated` | The list was capped at 50; the `*_count` fields stay exact |
+| `approximate` | The file was too large to diff exactly, so one coarse hunk is reported |
+| `symbols_status` | `ok`, `unsupported_language` (no server for this language), or `unavailable` (the server errored or timed out) |
+
+Turn it off with `telemetry.capture.codeStructure`. Query it through the
+`symbol_changes`, `file_change_summary` and `symbol_hotspots` views.
+
 ### Editor
 `editor.cursor_moved` · `editor.selection_changed` · `editor.active_changed` ·
 `editor.document_changed` · `editor.language_changed`

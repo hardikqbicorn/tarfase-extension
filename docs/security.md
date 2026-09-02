@@ -15,7 +15,7 @@ Hard rules. If a collector cannot satisfy these, it does not ship.
 | Private SSH/TLS keys | Obvious |
 | Environment variable **values** | `.env` files and shell exports are where secrets live |
 | Credit card numbers, SSNs | PII with legal weight |
-| **Source code / document content** | The single largest leak vector. Only counts and shapes are recorded |
+| **Source code / document content** | The single largest leak vector. Counts, shapes, and declaration names only — see "Symbol names" below |
 | **Terminal output** | Routinely contains tokens, connection strings, and dumped credentials |
 | **Diagnostic messages** | They quote source (`Cannot find name 'API_KEY'`) |
 | **Breakpoint conditions** | Arbitrary expressions over live values |
@@ -25,7 +25,41 @@ Hard rules. If a collector cannot satisfy these, it does not ship.
 
 What *is* collected in their place: event types, timestamps, counts (lines,
 characters, files, errors), languages, workspace-relative paths, branch names,
-commit SHAs, exit codes, and durations.
+commit SHAs, exit codes, durations, and the symbol names described next.
+
+## Symbol names: the one identifier that does leave
+
+`code.symbols_changed` reports which functions, classes and variables a save
+touched, **by name** — `OrderService.calculateTotal`, `MAX_RETRIES`. This is
+worth stating plainly because it is the only place an identifier written by
+the developer leaves the machine.
+
+What makes it a different thing from source code:
+
+- The names come from the **document symbol tree**, not from the text. The
+  extension asks VS Code for the declarations the language server already
+  parsed. A string literal, a comment, a hardcoded key, the body of a
+  function — none of it is in that tree, so none of it can be read out.
+- The diff that produces line numbers runs in the extension, and the lines are
+  discarded before the event is built. No hunk text is retained.
+- Only the **declaration name** is available, never the value. A change to
+  `const API_KEY = "sk-live-…"` reports `{"name": "API_KEY", "kind":
+  "variable", "lines_added": 1}`. The literal is never seen.
+
+A test asserts this directly: it edits a line containing a live-looking key and
+checks the serialised event contains neither the key nor any source token.
+
+Two settings control it:
+
+| Setting | Effect |
+| --- | --- |
+| `telemetry.capture.codeStructure` | `false` stops these events entirely |
+| `telemetry.hashFilePaths` | Hashes paths; symbol names are unaffected |
+
+If your threat model makes identifiers sensitive — a codebase where class names
+disclose unreleased products or customer names — turn `capture.codeStructure`
+off. It is a deliberate, separable capability rather than something folded into
+file events.
 
 ## Redaction
 

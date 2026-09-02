@@ -7,6 +7,7 @@ import { CollectorDeps } from "./collectors/types";
 import { registerWorkspaceCollectors } from "./collectors/workspace";
 import { registerFileCollectors } from "./collectors/files";
 import { registerEditorCollectors } from "./collectors/editor";
+import { registerCodeStructureCollectors } from "./collectors/code-structure";
 import { registerTerminalCollectors } from "./collectors/terminal";
 import { registerGitCollectors } from "./collectors/git";
 import { registerDebugCollectors } from "./collectors/debug";
@@ -64,6 +65,7 @@ export class VSCodeAdapter implements IdeAdapter {
       registerWorkspaceCollectors,
       registerFileCollectors,
       registerEditorCollectors,
+      registerCodeStructureCollectors,
       registerTerminalCollectors,
       registerGitCollectors,
       registerDebugCollectors,

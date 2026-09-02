@@ -40,6 +40,42 @@ const examples = [
   },
   {
     description:
+      "The structural summary of a save: which constructs the edit landed in, and how much of the file it left alone. `kind` comes from the language server that owns the file, so it is exact rather than inferred. Names, kinds and counts only - no line of source is included.",
+    event: createEvent({
+      ...base,
+      eventType: EVENT_TYPES.CODE_SYMBOLS_CHANGED,
+      file: { path: "src/checkout/payment.ts", language: "typescript" },
+      payload: {
+        lines_added: 2,
+        lines_removed: 1,
+        lines_unchanged: 246,
+        hunk_count: 1,
+        symbols_changed: [
+          {
+            name: "capture",
+            qualified_name: "PaymentService.capture",
+            kind: "method",
+            lines_added: 2,
+            lines_removed: 1,
+            edit_count: 1,
+            signature_changed: false,
+          },
+        ],
+        symbols_changed_count: 1,
+        symbols_unchanged_count: 11,
+        symbols_total: 12,
+        kinds_changed: ["method"],
+        unattributed_hunks: 0,
+        unattributed_lines_added: 0,
+        unattributed_lines_removed: 0,
+        symbols_truncated: false,
+        approximate: false,
+        symbols_status: "ok",
+      },
+    }),
+  },
+  {
+    description:
       "A document edit. Throttled per file (default 1s). Character counts only; `likely_bulk_insert` flags a large single insertion, which usually means a paste or an AI completion.",
     event: createEvent({
       ...base,

@@ -37,6 +37,7 @@ export function readConfig(): CollectorConfig {
       buildTestDebug: cfg.get<boolean>("capture.buildTestDebug", true),
       ai: cfg.get<boolean>("capture.ai", true),
       aiContent: cfg.get<boolean>("capture.aiContent", false),
+      codeStructure: cfg.get<boolean>("capture.codeStructure", true),
     },
     throttle: {
       cursorMovedMs: cfg.get<number>("throttle.cursorMovedMs", 2000),

@@ -156,6 +156,11 @@
           "default": false,
           "description": "Include redacted AI prompt and response text when a cooperating provider reports it."
         },
+        "telemetry.capture.codeStructure": {
+          "type": "boolean",
+          "default": true,
+          "description": "On save, report which functions, classes and variables changed, and how much of the file did not. Uses your installed language servers. Sends symbol names, kinds and line counts - never source code."
+        },
         "telemetry.throttle.cursorMovedMs": {
           "type": "number",
           "default": 2000,

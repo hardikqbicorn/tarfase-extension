@@ -18,6 +18,12 @@ export const EVENT_TYPES = {
   FILE_RENAMED: "file.renamed",
   FILE_SAVED: "file.saved",
   FILE_MODIFIED: "file.modified",
+  /**
+   * Structural summary of a save: which named constructs changed, and how much
+   * of the file did not. Structure only - names, kinds and counts, never a
+   * line of source.
+   */
+  CODE_SYMBOLS_CHANGED: "code.symbols_changed",
 
   // Editor
   EDITOR_CURSOR_MOVED: "editor.cursor_moved",

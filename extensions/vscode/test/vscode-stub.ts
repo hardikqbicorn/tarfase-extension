@@ -142,6 +142,10 @@ export const state = {
   gitExtension: undefined as any,
   appName: "Visual Studio Code",
   version: "1.90.0",
+  /** Documents `workspace.textDocuments` reports as already open. */
+  openDocuments: [] as StubDocument[],
+  /** Handles `commands.executeCommand`; keyed by command name. */
+  commandResults: new Map<string, (...args: unknown[]) => unknown>(),
 };
 
 export function resetStub(): void {
@@ -154,6 +158,8 @@ export function resetStub(): void {
   state.diagnostics.clear();
   state.gitExtension = undefined;
   state.appName = "Visual Studio Code";
+  state.openDocuments = [];
+  state.commandResults.clear();
 }
 
 export const workspace = {
@@ -176,6 +182,9 @@ export const workspace = {
         state.configuration.set(`${section}.${key}`, value);
       },
     };
+  },
+  get textDocuments() {
+    return state.openDocuments;
   },
   onDidOpenTextDocument: emitters.didOpenTextDocument.event,
   onDidCloseTextDocument: emitters.didCloseTextDocument.event,
@@ -243,8 +252,44 @@ export const env = {
 
 export const commands = {
   registerCommand: (_name: string, _handler: unknown) => new Disposable(() => {}),
-  executeCommand: async () => undefined,
+  executeCommand: async (name: string, ...args: unknown[]) => {
+    const handler = state.commandResults.get(name);
+    return handler ? handler(...args) : undefined;
+  },
 };
+
+/**
+ * VS Code's SymbolKind, numeric with a reverse mapping - the collector relies
+ * on `SymbolKind[kind]` yielding "Function", "Variable" and so on.
+ */
+export enum SymbolKind {
+  File = 0,
+  Module = 1,
+  Namespace = 2,
+  Package = 3,
+  Class = 4,
+  Method = 5,
+  Property = 6,
+  Field = 7,
+  Constructor = 8,
+  Enum = 9,
+  Interface = 10,
+  Function = 11,
+  Variable = 12,
+  Constant = 13,
+  String = 14,
+  Number = 15,
+  Boolean = 16,
+  Array = 17,
+  Object = 18,
+  Key = 19,
+  Null = 20,
+  EnumMember = 21,
+  Struct = 22,
+  Event = 23,
+  Operator = 24,
+  TypeParameter = 25,
+}
 
 export const version = state.version;
 
